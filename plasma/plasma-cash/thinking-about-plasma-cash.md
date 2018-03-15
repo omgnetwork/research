@@ -1,6 +1,10 @@
 Thinking about "Plasma Cash"
 ===
 
+Author: Kelvin Fichter
+
+---
+
 **Note:** this post and other similar writings represent unfinished or generally rambling thoughts. It's my opinion that organized train-of-thought documents can help other researchers in a multitude of ways. Certain things in this document might be completely wrong! I wanted to make sure that readers could see my thought process in *how* I came to certain (possibly mistaken!) conclusions. 
 
 ---
