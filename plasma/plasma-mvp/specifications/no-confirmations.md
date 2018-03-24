@@ -68,12 +68,11 @@ Rule #2 ensures that an invalid exit can't have higher priority than a valid exi
 
 ### Modifications to Plasma MVP
 
-We need to modify the Plasma MVP specification in order to implement these rules. The necessary changes are:
+We need to modify the Plasma MVP specification in order to implement these rules.
 
-1. Root chain needs to validate the transaction **and** its inputs.
-2. Exits must be challenged within 4 days.
+#### Change #1: The root chain needs to validate a transaction *and* its inputs before it can be exited
 
-Change #1 is necessary to ensure that we can't break Rule #2 in any useful way. Remember that Rule #2 requires that inputs be at least `n + 1` Plasma blocks old. The following example demonstrates why this change is necessary:
+This is necessary to ensure that we can't break Rule #2 in any useful way. Remember that Rule #2 requires that inputs be at least `n + 1` Plasma blocks old. The following example demonstrates why this change is necessary:
 
 1. Alice submits a transaction to Bob.
 2. The operator includes Alice's transaction after including a few invalid transactions. The operator reveals Alice's transaction (so Bob can exit), but doesn't reveal their own (so no one can prove those are invalid).
@@ -81,11 +80,15 @@ Change #1 is necessary to ensure that we can't break Rule #2 in any useful way. 
 4. Bob attempts to exit on his valid transaction.
 5. The operator's exit has higher priority than Bob's transaction, the operator withdraws first.
 
-However, if we require that inputs be at least `n + 1` blocks old, then anyone who stops submitting transactions once the chain is byzantine can safely exit. An operator attempting to create a UTXO from "out of thin air" inputs would have to create at least `n + 1` invalid blocks. 
+This isn't a problem if we have confirmations - Alice could simply refuse to confirm her transaction. We need to get more creative if we remove confirmations.
+
+If we require that inputs be at least `n + 1` blocks old, then anyone who stops submitting transactions once the chain is byzantine can safely exit. An operator attempting to create a UTXO from "out of thin air" inputs would have to create at least `n + 1` invalid blocks. 
 
 This breaks down if a user submits a transaction after the chain becomes byzantine. A client should *never* submit a transaction if they haven't received a block by the time the next block should've been published.
 
-Change #2 means that a withheld transaction can be safely withdrawn before an attacker completes any invalid exits. 
+#### Change #2: Exits must be challenged within 4 days
+
+This way, a withheld transaction can be safely withdrawn before an attacker completes any invalid exits. 
 
 Plasma MVP mitigates block withholding attacks by requiring users to submit confirmations. If we remove confirmations, then a transaction can be included and be considered valid even if the block is withheld. This means that an operator could challenge an exit with a withheld transaction. Change #2 attempts to solve this problem.
 
