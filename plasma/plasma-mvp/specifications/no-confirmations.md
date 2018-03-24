@@ -104,3 +104,27 @@ To better understand why this change is necessary, consider the following potent
 8. Bob cannot withdraw once his exits process because the operator has already empties the contract. 
 
 Consider the same scenario once we apply Change #2. If the operator only has 4 days to challenge Alice's exit, then Bob has 3 days to safely submit his exit. The operator's exits will be given a lower priority than Bob's exit, and Bob will complete his (valid) withdrawal.
+
+#### Alternative to Change #2: Special exit transactions
+
+Change #2 is somewhat unsatisfying because Alice *will* lose her exit deposit. We'd prefer to come up with some mechanism that avoids restricting the challenge period and allows Alice to keep her exit deposit.
+
+Piotr Dobaczewski came up with another construction that addresses this case. In a nutshell, Piotr's idea is that Alice creates a special type of exit that allows Bob to claim the funds within a period of time. If Bob doesn't complete the exit, then Alice can claim the funds. This special "limbo" exit can be invalidated by demonstrating that the UTXO (from Alice to Bob) was already spent.
+
+Piotr gave the following example of how this might work out:
+
+1. Alice buys a pear from Bob.
+2. The operator includes Alice's transaction but withholds the block. Alice's payment is now stuck in "limbo" because she doesn't know if her transaction was included or not.
+3. Alice starts a "limbo exit" that references her transaction to Bob. 
+4. Bob has 3 days to complete the exit. 
+
+One of two things can happen at this point:
+
+1. Bob completes the exit.
+2. Bob does not complete the exit. Alice completes the exit after 3 days.
+
+In either case, this exit can be challenged if a user demonstrates that Alice's UTXO to Bob is spent. If no challenges are submitted, then the exit processes and the funds are withdrawn.
+
+This is really cool, but a little complex. There's a potential for grieving if users are not actively watching for these type of transactions. For example, Alice could decide that she wants to cheat and get the money for her pear back. Assume that blocks are not being withheld and that Bob hasn't spent the UTXO from Alice's transaction. Alice could start the "limbo exit", which forces Bob to respond within 3 days. If Bob is offline for 3 days, then she might be able to steal Bob's funds. Bob's safest bet is therefore to immediately spend the funds to himself.
+
+We can avoid the grieving case by modifying the construction slightly so that the limbo exit can *only* exit to Bob and *only* if Bob signs off on it. The idea behind this modification is that Alice and Bob will want to complete their transaction if the two parties are cooperating. If blocks are being withheld and the two parties are not cooperating, then Alice can attempt to exit normally. If the transaction is included (and therefore complete), then Alice will need to find some extra-protocol settlement anyway. It's reasonable to assume that Alice can ask for her deposit as part of this settlement. 
