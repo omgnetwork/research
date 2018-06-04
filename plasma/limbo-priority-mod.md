@@ -33,7 +33,7 @@ A challenge of type (3) or (4) must be bonded, and are subject to a response.
 
 ### Type (3) Response
 
-Anyone may respond to a type (3) challenge by revealing that the requested input has been included in the chain such that it has a lower priority than the new priority. A valid response would slash the challenger's bond. A failure to respond would slash the original bond and block the modification.
+Anyone may respond to a type (3) challenge by revealing that the requested input has been included in the chain such that it has a higher priority than the new priority. A valid response would slash the challenger's bond. A failure to respond would slash the original bond and block the modification.
 
 ### Type (4) Response
 
