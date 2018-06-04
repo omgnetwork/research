@@ -20,11 +20,11 @@ The effect of this design is that an in-flight transaction that may or may not b
 
 A user may attempt to set the priority of a transaction by submitting a signed transaction and a block number to the root chain, subject to a challenge period. This action is bonded, and the priority of deposit ("out of nowhere") transactions cannot be modified. If no successful challenge occurs during the challenge period, then the transaction will have a priority as if it were the added to the end of the given block. 
 
-A priority modification can be challenged in four ways:
+A priority modification can be challenged in four ways (higher priority = would be exited sooner, lower priority = would be exited later):
 
-1. Someone shows that the specified transaction was included in a block, and that its priority is higher than the new priority. This prevents someone from decreasing a transaction's priority. 
+1. Someone shows that the specified transaction was included in a block, and that its original priority is higher than the new priority. This prevents someone from decreasing a transaction's priority. 
 2. Someone shows that any of the transaction's inputs would have a lower priority than the transaction. This prevents someone from moving a transaction "earlier" than any of the transaction's outputs.
-3. Someone requests that someone prove some input to the transaction has a lower priority than new priority. This is necessary if blocks are being withheld and a challenge of type (2) is not directly possible.
+3. Someone requests that someone prove some input to the transaction has a higher priority than new priority. This is necessary if blocks are being withheld and a challenge of type (2) is not directly possible.
 4. Someone shows that there exists another spend from any of the transaction's inputs. This spend must not be the same as the original transaction.
 
 A challenge of type (1) or (2) blocks the modification and slashes the submitter's bond. 
