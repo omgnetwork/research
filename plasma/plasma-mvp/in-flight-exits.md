@@ -1,6 +1,14 @@
-# Magic Withdrawals
+# More Viable Plasma
+
+Authors: Ben Jones, Kelvin Fichter
+
+And a very special thank you to vi, Li Xuanji, David Knott, Eva Beylin, Vitalik Buterin, and Kasima Tharnpipitchai for invaluable contributions to putting this together. 
+
+---
 
 ## TL;DR
+
+We propose an alternative to confirmation signatures and (semi) formalize the properties of any valid Plasma MVP exit game. Our game provides significantly improved UX at the cost of a two-period challenge-response scheme in the worst case. 
 
 ## Background
 
@@ -127,7 +135,7 @@ $$
 
 The liveness rule basically says that "if an output was exitable at some time and *is* spent later, then immediately after that spend, either it's still exitable or all of the spend's outputs are exitable, but not both".
 
-The second part probably makes sense - if something is spent, then all the resulting outputs should be exitable. The first case is special - if the spend is *invalid*, then the outputs should not be exitable and the input should still be exitable. So a short way to describe "liveness" is that all "canonical" transactions (and *only* "canonical" transactions) should impact the set of exitable transactions.
+The second part probably makes sense - if something is spent, then all the resulting outputs should be exitable. The first case is special - if the spend is *invalid*, then the outputs should not be exitable and the input should still be exitable. So a short way to describe "liveness" is that all "canonical" transactions should impact the set of exitable transactions.
 
 We define "canonical" later.
 
@@ -148,7 +156,7 @@ We need to formally show our exit game produces the exitable outputs $E$. To hel
 We call two transactions "competing" if they contain any of the same inputs. The list of "competitors" to a transaction is formally defined as follows:
 
 $$
-competitors(t) = \{ t_{i} | i \in (0, n], I(t_{i}) \cap I(t) \neq \varnothing \}
+competitors(t) = \{ t_{i} : i \in (0, n], I(t_{i}) \cap I(t) \neq \varnothing \}
 $$
 
 Note that a transaction is a competitor to itself. 
@@ -163,20 +171,20 @@ $$
 first(T) = t \in T : \forall t' \in T, t \neq t', min(O(t)) < min(O(t'))
 $$
 
-Then we can define a function that takes a transaction and returns the "canonical" spend in its set of competitors.
+Then we can define a function that takes a transaction and returns whether it's the "canonical" spend in its set of competitors.
 
 $$
-canonical: TX \rightarrow TX
+canonical: TX \rightarrow bool
 $$
 
 $$
-canonical(t) = first(competitors(t))
+canonical(t) = (first(competitors(t)) \stackrel{?}{=} t)
 $$
 
 Finally, we say that "reality" is the set of canonical transactions for a given Plasma chain.
 
 $$
-reality(T_{n}) = \{ canonical(t_{i}) | i \in (0, n]\}
+reality(T_{n}) = \{ canonical(t_{i}) : i \in (0, n]\}
 $$
 
 #### Unspent, Double Spent
@@ -231,7 +239,7 @@ $$
 
 So to prove this for our $E(T_{n})$, let's take some $o \in E(T_{n})$. From our definition, $o$ must be in $unspent(reality(T_{n}))$, and must not be in $double\_spent(T_{n})$.
 
-$o \not\in I(t_{n+1})$ means that $o$ will still be in $reality$, because only another transaction spending $o$ would change this. Also, $o$ can't be spent (or double spent) if it wasn't used as an input. So our function is safe!
+$o \not\in I(t_{n+1})$ means that $o$ will still be in $reality$, because only a transaction spending $o$ can impact its inclusion in $reality$. Also, $o$ can't be spent (or double spent) if it wasn't used as an input. So our function is safe!
 
 #### Liveness
 
@@ -241,7 +249,7 @@ $$
 \forall o \in E(T_{n}), o \in I(t_{n+1}) \implies o \in E(T_{n+1}) \oplus O(t_{n+1}) \subseteq E(T_{n+1})
 $$
 
-This is a little more annoying to prove, because we need to show each implication holds separately, but not together. Basically, given $\forall o \in E(T_{n}), o \in I(t_{n+1})$:
+This is more annoying to prove, because we need to show each implication holds separately, but not together. Basically, given $\forall o \in E(T_{n}), o \in I(t_{n+1})$, we need:
 
 $$
 o \in E(T_{n+1}) \implies O(t_{n+1}) \cap E(T_{n+1}) = \varnothing
@@ -255,59 +263,50 @@ $$
 
 Let's prove the first. $o \in I(t_{n+1})$ means $o$ was spent in $t_{n+1}$. However, $o \in E(T_{n+1})$ means that it's unspent in any canonical transaction. Therefore, $t_{n+1}$ cannot be a canonical transaction. $O(t_{n+1}) \cap E(T_{n+1})$ is empty if $t_{n+1}$ is not canonical, so we've shown the first statement. 
 
-Next, we'll show the second statement is true. $O(t_{n+1}) \subseteq E(T_{n+1})$ implies that $t_{n+1}$ is in $reality(T_{n+1})$. If $t_{n+1}$ is in $reality(T_{n+1})$, and $o$ is an input to $t_{n+1}$, then $o$ is no longer in $unspent(reality(T_{n+1}))$, and therefore $o \not\in E(T_{n+1})$.
+Next, we'll prove the second statement. $O(t_{n+1}) \subseteq E(T_{n+1})$ implies that $t_{n+1}$ is canonical. If $t_{n+1}$ is canonical, and $o$ is an input to $t_{n+1}$, then $o$ is no longer unspent, and therefore $o \not\in E(T_{n+1})$.
 
 ## In-flight Exit Game
 
-We consider a game $g(t):TX \rightarrow (o_1,o_2,...,o_n)$ which returns the list of exitable txo's of a given transaction. We must show that:
-
-$$
-\forall o \in TXO(t), o \in F(T_{n}) \iff o \in g(t)
-$$
-
-In other words, if the game is played on a transaction, it will correctly exit the transaction's entire list of exitable inputs or outputs.
+We have to construct a game which, given a transaction, returns any exitable inputs or outputs.
 
 ### Construction
 
-Our exit game involves two periods, triggered by a user who posts a bond alongside the transaction in limbo.  The first period consists of the following:
+In the non-byzantine case, we can always use the standard exit game. However, in the event of invalid transactions or witheld blocks, we need to constuct a 
+"special exit".
 
-1. Honest owners of inputs or outputs to the posted transaction "piggyback" and post a bond, claiming that they have not double spent.
-2. Any user may present other spends of the posted transaction's inputs.
+Our exit game involves two periods, triggered by a user who posts a bond alongside a transaction $t$. The first period consists of the following:
 
-Users who present a spend (2.) must place a bond. Any other user may present an earlier spend, claim the bond, and place a new bond. This construction ensures that the last presented spend is the earliest known spend. 
+1. Honest owners of inputs or outputs to $t$ "piggyback" on this exit and post a bond. Users who do not piggyback will not be able to exit.
+2. Any user may present any competitor to $t$.
 
-The first user to present a spend kicks all outputs from the exit queue. 
+Users who present a competitor (2.) must place a bond. Any other user may present an earlier competitor, claim the bond, and place a new bond. This construction ensures that the last presented competitor is also the earliest competitor. 
 
-If no other spends of the posted transaction are brought to light in this first period (as per 2.), then the second period asks for on-chain pointers to spends of the outputs, which invalidates that output's exit and removes it from the queue. The bonds of all inputs and honest outputs are returned.
+If no competitors to $t$ are brought to light, then the outputs can be challenged by an included spend. Any unchallenged outputs are exited. The bonds of all inputs and honest outputs are returned.
 
-Otherwise, if other spends of the posted transaction's inputs are brought to light, period 2 serves to determine whether the posted transaction is canonical. Any user may present:
-1. The posted transaction, included in the chain before any alternative spends presented in period 1. 
-2. Spends of any "piggybacked" inputs or outputs (except the presented transaction itself).
-3. That some input is not in the set of "unspent reality" by demonstrating that the transaction that created the input is not canonical. This means revealing both the transaction that created the input, as well as some alternative spend of any of that revealed transaction's inputs such that the alternative spend came first and can be properly prioritized.
+Otherwise, if competitors were presented, period 2 serves to determine whether $t$ is canonical. Any user may present:
+1. $t$, included in the chain before all competitors presented in period 1. 
+2. Spends of any "piggybacked" inputs or outputs (except $t$ itself).
+3. That some input was not created by a canonical transaction. This means revealing both the transaction that created the input, as well as some competitor to that transaction such that the competitor came first.
 
-If (1.) is presented, then all (unspent, piggybacked) inputs are kicked out of the exit queue, all (unspent, piggybacked) outputs are added back into the queue, and remaining bonds over the inputs are refunded.
+Challenges of type (2.) block any spent inputs or outputs to $t$ from exiting. Challenges of type (3.) block any non-canonical inputs from exiting. 
 
-Challenges of type (3.) basically ensure that the piggybacked inputs are part of a canonical transaction.
-
-Note that challenges of piggybacked inputs or outputs (via 2. or 3.) make the inputs or outputs unexitable, even if the input/output isn't in the exit queue at that time. 
-
-This means that at the end of the game, only correctly exitable transactions will still be in the queue. 
+At the end of the game, only correctly exitable transactions will still be in the queue. 
 
 ### Justification
 
-This construction essentially allows any individual output to exit if it satisfies the following conditions:
-1. A valid earlier spend of one of its inputs does not exist on-chain.
-2. A valid spend of it does not exist on-chain.
-3. It has not been double spent (though note that if it has, the unspent outputs of the first valid spend, if such a spend exists, are exitable separately).
+This construction essentially allows any input or output to exit if it satisfies the following conditions:
+1. An earlier spend of one of its inputs does not exist.
+2. A spend of it does not exist.
+3. It has not been double spent (though note that if it has, the unspent outputs of the first canonical spend, if such a spend exists, are exitable separately).
 
-(1.) is satisfied for the posted transaction by the challenge-response game between periods 1 and 2, and for each of the inputs by a type (3.) challenge in period 2. 
+(1.) is satisfied for $t$ by the challenge-response game between periods 1 and 2, and for each of $t$'s inputs by a type (3.) challenge in period 2. 
 
 Both (2.) and (3.) are satisfied by any type (2.) challenge in period 2. 
 
-In other words for any transaction $t \in T_{n}$ submitted to the game, any output $o \in t$, the game determines if:
+In other words, the game determines if:
 
-1. $t \in reality(T_{n})$
-2. $o \in unspent(reality(T_{n}))$
+1. $canonical(t)$
+2. $o \in unspent(T_{n})$
 3. $o \not\in double\_spent(T_{n})$
 
 If all of these are true, then:
@@ -316,8 +315,4 @@ $$
 o \in unspent(reality(T_{n})) \setminus double\_spent(T_{n}) = E(T_{n})
 $$
 
-So our game will determine $E(T_{n})$ correctly.
-
-## Summary 
-
-We fixed Plasma.
+Otherwise, $o \not\in E(T_{n})$, which is the desired result.
