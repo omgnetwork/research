@@ -43,8 +43,8 @@ The first requirement in both games ensures that the transaction is correctly fo
 The second requirement has something to do with a concept we call transaction “canonicity.”
 Simply defined, a transaction is “canonical” if none of the transaction’s inputs have been previously spent.
 Let's suppose there exist two transactions `tx` and `other_tx` such that `tx` and `other_tx` share at least one input.
-If `tx` is included in the Plasma chain, then `tx` is not canonical if `other_tx` is included before `tx` (in an earlier block or in the same block and an earlier transaction index).
-If `tx` is not included in the Plasma chain, then `tx` is not canonical if `other_tx` exists.
+If `tx` *is* included in the Plasma chain, then `tx` is not canonical if `other_tx` is included before `tx` (in an earlier block or in the same block and an earlier transaction index).
+If `tx` is *not* included in the Plasma chain, then `tx` is not canonical if `other_tx` exists.
 In this sense, the shared input is being double-spent in `tx` because it was already used in `other_tx`. 
 `tx` is canonical if a transaction `other_tx` that would make `tx` not canonical by the above rules does not exist.
 
