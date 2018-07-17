@@ -68,20 +68,28 @@ Note, however, that the above exit game fails to provide safety if exit priority
 To illustrate, imagine the following scenario:
 
 1. Alice sends transaction `tx` to Bob.
-2. The operator creates a block with invalid transaction `inv_tx`, and includes `tx` after `inv_tx`.
+2. The operator creates a block with some "bad" (violates a consensus rule) transaction `inv_tx` and includes `tx` after `inv_tx`.
 3. Bob starts the exit game with `tx`.
 4. The operator starts the exit game with `inv_tx`.
 
-Because both `tx` and `inv_tx` appear to be properly formed and signed, both Bob and the operator can prove (1).
-Similarly, because none of the inputs to `tx` and `inv_tx` have been spent in some transaction other than `tx` and `inv_tx`, respectively, both can prove (2).
-Finally, because Bob and the operator have not spent their outputs, both can prove (3). 
+Note: The operator's "bad" transaction is deliberately vague.
+The specific reason why this transaction is "bad" can vary for any number of reasons.
+It could be that this transaction is a double spend, that it creates money on the Plasma chain without a corresponding deposit, or that it violates any other consensus rule.
+The important thing here is that transactions that don't violate consensus rules should be able to exit before transactions that do. 
 
+Bob and the operator can both prove that their respective transactions (`tx`, `inv_tx`) are properly formed and signed.
+Similarly, both can prove that none of the inputs to `tx` and `inv_tx` have been spent in some transaction other than `tx` and `inv_tx`, respectively.
+Finally, both can prove that they haven't spent their outputs.
+
+Now we have a situation where both exits can be processed. 
 Obviously, we don’t want the operator’s exit to be processed before Bob’s exit.
 This will unfortunately be the case if we determine priority based on the age of the output.
 To solve this problem, we change introduce a slight change to how exit priority is handled.
 
 In the MoreVP exit game, within an exit on a transaction `t`, we calculate the priority every input or output of `t` based on the position (block number, transaction index, output index) of the youngest input to `t` (“youngest-input priority”).
 
-Now we can very easily see that, as long as Alice’s input was included in the Plasma chain before the invalid transaction, Bob’s exit will be processed first.
-It’s pretty easy to prove that this holds for *any* transaction, as long as all of a transaction’s inputs were included in the chain before the invalid transaction.
+Now we can very easily see that, as long as Alice’s input was included in the Plasma chain before the "bad" transaction, Bob’s exit will be processed first.
+It’s pretty easy to prove that this holds for *any* transaction, as long as all of a transaction’s inputs were included in the chain before the "bad" transaction.
+
+Note that if Alice's input was included *after* the "bad" transaction and Alice spent that input, the inputs/outputs to this transaction can no longer be safely exited.
 In practice, this simply means that clients should never spend a UTXO if they haven’t validated the entire chain up (and including) the transaction in which that UTXO was created. 
