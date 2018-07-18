@@ -23,6 +23,7 @@ This motivates the search for an alternative exit game that removes the need for
 ## More Viable Plasma
 
 More Viable Plasma (“MoreVP”) proposes an exit game that removes the need for confirmation signatures and ensures correct transaction processing order.
+This new exit game properly processes submitted exits from transactions that follow consensus rules ("valid transactions") before all other ("invalid") transactions, even if those transactions are in-flight. 
 
 ### Basic Exit Game
 
