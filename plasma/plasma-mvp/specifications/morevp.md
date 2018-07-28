@@ -54,11 +54,6 @@ If a transaction is “exitable,” then a user may attempt to start an exit tha
 A deposit transaction is “valid” if and only if it corresponds exactly to a single deposit on the root chain and is the first deposit transaction to correspond to that deposit. A spend transaction is “valid” if and only if it is exitable, canonical, and only stems from valid transactions (i.e. all transactions in the history are also valid transactions). Note that a transaction would therefore be considered invalid if even a single invalid transaction is present in its history. An exitable transaction is not necessarily a valid transaction.
 
 
-#### Correct Transaction
-
-A deposit transaction is “correct” if and only if it is valid. A spend transaction is “correct” if and only if it is exitable and only stems from valid transactions. All valid deposit transactions are also correct deposit transactions, but a spend transaction can be correct without also being valid in the case that the transaction is non-canonical. We make this distinction because it’s possible for a user to honestly sign a transaction that becomes non-canonical if another input to the transaction signs a second spend transaction. We later assert that users who only sign correct transactions are safe under our exit protocol.
-
-
 ### Basic Specification
 
 The MoreVP exit protocol allows the owners of both inputs and outputs to a transaction to attempt an exit. 
@@ -73,7 +68,7 @@ The owner of an output `out` to a transaction `tx` must prove that:
 2. `tx` is canonical.
 3. `out` is not spent.
 
-Exits are then ordered by the position of the *youngest input* to the transaction referenced in each exit. Proof XXX in the appendix shows that this ordering ensures that all exits that reference correct transactions will be paid out before any exit that references an invalid transaction. 
+Exits are then ordered by the position of the *youngest input* to the transaction referenced in each exit. Proof XXX in the appendix shows that this ordering ensures that all outputs created by valid transactions will be paid out before any output created by an invalid transaction. 
 
 
 ## Exit Protocol Implementation
