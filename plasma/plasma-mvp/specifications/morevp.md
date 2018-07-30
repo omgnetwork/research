@@ -2,27 +2,41 @@
 
 ## Introduction
 
-[Minimal Viable Plasma](https://ethresear.ch/t/minimal-viable-plasma/426) (“Plasma MVP”) describes a simple specification for a UTXO-based Plasma chain. A key component of the Plasma MVP design is a protocol for “exits,” whereby a user may withdraw back to the root chain any funds available to them on the Plasma chain. The protocol presented in the specification requires users sign two signatures for every transaction. Concerns over the poor user experience presented by this protocol motivated the search for an alternative exit protocol. 
+[Minimal Viable Plasma](https://ethresear.ch/t/minimal-viable-plasma/426) (“Plasma MVP”) describes a simple specification for a UTXO-based Plasma chain.
+A key component of the Plasma MVP design is a protocol for “exits,” whereby a user may withdraw back to the root chain any funds available to them on the Plasma chain.
+The protocol presented in the specification requires users sign two signatures for every transaction.
+Concerns over the poor user experience presented by this protocol motivated the search for an alternative exit protocol.
 
-In this document, we describe More Viable Plasma (“MoreVP”), a modification to the Plasma MVP exit protocol that improves user experience. The MoreVP exit protocol ensures the security of assets for clients correctly following the protocol. We initially present the most basic form of the MoreVP protocol and provide intuition towards its correctness.  We formalize certain requirements for Plasma MVP exit protocols and provide a proof that this protocol satisfies these requirements in the appendix.
+In this document, we describe More Viable Plasma (“MoreVP”), a modification to the Plasma MVP exit protocol that improves user experience.
+The MoreVP exit protocol ensures the security of assets for clients correctly following the protocol.
+We initially present the most basic form of the MoreVP protocol and provide intuition towards its correctness.
+We formalize certain requirements for Plasma MVP exit protocols and provide a proof that this protocol satisfies these requirements in the appendix.
 
-An optimized version of the protocol is presented to account for restrictions of the Ethereum Virtual Machine. We further optimize on the observation that the MoreVP exit protocol is only necessary for transactions that are in-flight when a chain becomes byzantine. 
+An optimized version of the protocol is presented to account for restrictions of the Ethereum Virtual Machine.
+We further optimize on the observation that the MoreVP exit protocol is only necessary for transactions that are in-flight when a chain becomes byzantine.
 
-We note the existence of certain attack vectors in the protocol, but find that most of these vectors can be largely mitigated and isolated to a relatively small attack surface. These attack vectors and their mitigations are described in detail. Although we conclude that the design is safe under certain reasonable assumptions about user behavior, some points are highlighted and earmarked for future consideration.
+We note the existence of certain attack vectors in the protocol, but find that most of these vectors can be largely mitigated and isolated to a relatively small attack surface.
+These attack vectors and their mitigations are described in detail.
+Although we conclude that the design is safe under certain reasonable assumptions about user behavior, some points are highlighted and earmarked for future consideration.
 
-Overall, the MoreVP exit protocol is a significant improvement over the original Plasma MVP exit protocol. We can further combine several optimizations to enhance user experience and reduce costs for users. Future work will focus on decreasing implementation complexity of the design and minimizing contract gas usage. 
+Overall, the MoreVP exit protocol is a significant improvement over the original Plasma MVP exit protocol.
+We can further combine several optimizations to enhance user experience and reduce costs for users.
+Future work will focus on decreasing implementation complexity of the design and minimizing contract gas usage.
 
 
 ## Exit Protocol
 
-In this section, we specify the MoreVP exit protocol and give an intuitive argument toward its correctness. A formal treatment of the protocol is presented in the appendix. 
+In this section, we specify the MoreVP exit protocol and give an intuitive argument toward its correctness.
+A formal treatment of the protocol is presented in the appendix.
 
 
 ### Definitions
 
 #### Deposit Transaction
 
-A deposit transaction is a special type of transaction that creates a new balance on the Plasma chain. This is similar to a Bitcoin "coinbase" transaction. In practice, this takes the form of a transaction with a single “special” input. 
+A deposit transaction is a special type of transaction that creates a new balance on the Plasma chain.
+This is similar to a Bitcoin "coinbase" transaction.
+In practice, this takes the form of a transaction with a single “special” input.
 
 
 #### Spend Transaction
@@ -32,36 +46,47 @@ A spend transaction is any transaction that spends a UTXO present on the Plasma 
 
 #### In-flight Transaction
 
-A transaction is considered to be “in-flight” if it has been broadcast but has not yet been included in the Plasma chain. 
+A transaction is considered to be “in-flight” if it has been broadcast but has not yet been included in the Plasma chain.
 
 
 #### Competing Transaction, Competitors
 
-Two transactions are “competing” if they share at least one input. The “competitors” to a transaction is the set of all transactions that are competing with the transaction in question, including the transaction itself.
+Two transactions are “competing” if they share at least one input.
+The “competitors” to a transaction is the set of all transactions that are competing with the transaction in question, including the transaction itself.
 
 
 #### Canonical Transaction
 
-A transaction is “canonical” if none of its inputs were previously spent in any other transaction, i.e. that the transaction is the oldest among all its competitors. The definition of “previously spent” depends on whether or not the transaction in question is included in the Plasma chain.
+A transaction is “canonical” if none of its inputs were previously spent in any other transaction, i.e. that the transaction is the oldest among all its competitors.
+The definition of “previously spent” depends on whether or not the transaction in question is included in the Plasma chain.
 
-The position of a transaction in the chain is determined by the tuple (block number, transaction index). If the transaction was included in the chain, an input to that transaction would be considered previously spent if another transaction also spending the input was included in the chain *before* the transaction in question, decided by transaction position. If the transaction was not included in the chain, an input to that transaction would be considered previously spent if another transaction also spending the input is *known to exist*.
+The position of a transaction in the chain is determined by the tuple (block number, transaction index).
+If the transaction was included in the chain, an input to that transaction would be considered previously spent if another transaction also spending the input was included in the chain *before* the transaction in question, decided by transaction position.
+If the transaction was not included in the chain, an input to that transaction would be considered previously spent if another transaction also spending the input is *known to exist*.
 
-Note that in this second case it’s unimportant whether or not the other transaction is included in the chain. If the other transaction is included in the chain, then the other transaction is clearly included before the transaction in question. If the other transaction is not included in the chain, then we can’t tell which transaction “came first” and therefore simply say that neither is canonical. 
+Note that in this second case it’s unimportant whether or not the other transaction is included in the chain.
+If the other transaction is included in the chain, then the other transaction is clearly included before the transaction in question.
+If the other transaction is not included in the chain, then we can’t tell which transaction “came first” and therefore simply say that neither is canonical.
 
 
 #### Exitable Transaction
 
-If a transaction is “exitable,” then a user may attempt to start an exit that references the transaction. All deposit transactions are “exitable” by default. A spend transaction can be called “exitable” if the transaction is correctly formed (e.g. more input value than output value, inputs older than outputs, proper structure) and is properly signed by the owners of the transaction’s inputs. 
+If a transaction is “exitable,” then a user may attempt to start an exit that references the transaction.
+All deposit transactions are “exitable” by default.
+A spend transaction can be called “exitable” if the transaction is correctly formed (e.g. more input value than output value, inputs older than outputs, proper structure) and is properly signed by the owners of the transaction’s inputs.
 
 
 #### Valid Transaction
 
-A deposit transaction is “valid” if and only if it corresponds exactly to a single deposit on the root chain and is the first deposit transaction to correspond to that deposit. A spend transaction is “valid” if and only if it is exitable, canonical, and only stems from valid transactions (i.e. all transactions in the history are also valid transactions). Note that a transaction would therefore be considered invalid if even a single invalid transaction is present in its history. An exitable transaction is not necessarily a valid transaction, but all valid transactions are, by definition, exitable.
+A deposit transaction is “valid” if and only if it corresponds exactly to a single deposit on the root chain and is the first deposit transaction to correspond to that deposit.
+A spend transaction is “valid” if and only if it is exitable, canonical, and only stems from valid transactions (i.e. all transactions in the history are also valid transactions).
+Note that a transaction would therefore be considered invalid if even a single invalid transaction is present in its history.
+An exitable transaction is not necessarily a valid transaction, but all valid transactions are, by definition, exitable.
 
 
 ### Basic Specification
 
-The MoreVP exit protocol allows the owners of both inputs and outputs to a transaction to attempt an exit. 
+The MoreVP exit protocol allows the owners of both inputs and outputs to a transaction to attempt an exit.
 
 The owner of an input `in` to a transaction `tx` must prove that:
 1. `tx` is exitable.
@@ -76,72 +101,126 @@ The owner of an output `out` to a transaction `tx` must prove that:
 
 #### Priority
 
-The above game correctly selects the inputs or outputs that are eligible to exit. However, we still need to enforce an ordering on exits to ensure that all outputs created by valid transactions will be paid out before any output created by an invalid transaction. We do this by ordering every exit by the position of the *youngest input* to the transaction referenced in each exit.
+The above game correctly selects the inputs or outputs that are eligible to exit.
+However, we still need to enforce an ordering on exits to ensure that all outputs created by valid transactions will be paid out before any output created by an invalid transaction.
+We do this by ordering every exit by the position of the *youngest input* to the transaction referenced in each exit.
 
 
 ## Exit Protocol Implementation
 
 ### Motivation
 
-The MoreVP exit protocol described above guarantees that correctly behaving users will always be able to withdraw any funds they hold on the Plasma chain. However, we avoided describing how the users actually prove the statements they’re required to prove. This section presents a specification for an implementation of the exit protocol. The implementation is designed to be deployed to Ethereum and, as a result, some details of this specification take into account limitations of the EVM.
+The MoreVP exit protocol described above guarantees that correctly behaving users will always be able to withdraw any funds they hold on the Plasma chain.
+However, we avoided describing how the users actually prove the statements they’re required to prove.
+This section presents a specification for an implementation of the exit protocol.
+The implementation is designed to be deployed to Ethereum and, as a result, some details of this specification take into account limitations of the EVM.
 
-Additionally, the MoreVP exit protocol is not necessary in all cases. Previous work shows that we can use the Plasma MVP exit protocol without confirmation signatures for any transaction included before an invalid (or, in the case of withheld blocks, potentially invalid) transaction. We therefore only need to make use of the MoreVP protocol for the set transactions that are in-flight when a Plasma chain becomes byzantine. This also means that we can force deposit transactions to use the Plasma MVP exit protocol as these transactions would never be in-flight. 
+Additionally, the MoreVP exit protocol is not necessary in all cases.
+Previous work shows that we can use the Plasma MVP exit protocol without confirmation signatures for any transaction included before an invalid (or, in the case of withheld blocks, potentially invalid) transaction.
+We therefore only need to make use of the MoreVP protocol for the set transactions that are in-flight when a Plasma chain becomes byzantine.
+This also means that we can force deposit transactions to use the Plasma MVP exit protocol as these transactions would never be in-flight.
 
-The MoreVP protocol guarantees that if transaction is exitable then either the unspent inputs or unspent outputs can be withdrawn. Whether the inputs or outputs can be withdrawn depends on if the transaction is canonical. However, in the particular situation in which MoreVP exits are required, users may not be aware that an in-flight transaction is actually non-canonical. This can occur if the owner of an input to an in-flight transaction is malicious and has signed a second transaction spending the same input. 
+The MoreVP protocol guarantees that if transaction is exitable then either the unspent inputs or unspent outputs can be withdrawn.
+Whether the inputs or outputs can be withdrawn depends on if the transaction is canonical.
+However, in the particular situation in which MoreVP exits are required, users may not be aware that an in-flight transaction is actually non-canonical.
+This can occur if the owner of an input to an in-flight transaction is malicious and has signed a second transaction spending the same input.
 
-To account for this problem, we allow exits to be ambiguous about canonicity. Users can start MoreVP exits with the *assumption* that the referenced transaction is canonical. Other owners of inputs or outputs to the transaction can then join (or “piggyback”) the exit. We add cryptoeconomic mechanisms that determine whether the transaction is canonical and which of the inputs or outputs are unspent. The end result is that we can correctly determine which inputs or outputs should be paid out.  
+To account for this problem, we allow exits to be ambiguous about canonicity.
+Users can start MoreVP exits with the *assumption* that the referenced transaction is canonical.
+Other owners of inputs or outputs to the transaction can then join (or “piggyback”) the exit.
+We add cryptoeconomic mechanisms that determine whether the transaction is canonical and which of the inputs or outputs are unspent.
+The end result is that we can correctly determine which inputs or outputs should be paid out.
 
 
 ### MoreVP Exit Protocol Specification
 
 #### Timeline
 
-The MoreVP exit protocol requires the use of a “challenge-response” mechanism, whereby users can submit a challenge but are subject to a response that invalidates the challenge. To give users enough time to respond to a challenge, the exit process is split into two “periods.” When challenges are subject to a response, we require that the challenges be submitted before the end of the first exit period and that responses be submitted before the end of the second. We define each period to have a length of half the minimum exit period (MEP). Currently, the MEP is set to 7 days, so each period has a length of 3.5 days. 
+The MoreVP exit protocol requires the use of a “challenge-response” mechanism, whereby users can submit a challenge but are subject to a response that invalidates the challenge.
+To give users enough time to respond to a challenge, the exit process is split into two “periods.” When challenges are subject to a response, we require that the challenges be submitted before the end of the first exit period and that responses be submitted before the end of the second.
+We define each period to have a length of half the minimum exit period (MEP).
+Currently, the MEP is set to 7 days, so each period has a length of 3.5 days.
 
 
 #### Starting the Exit
 
 For simplicity, we block deposit transactions from using the MoreVP exit protocol.
 
-Any user may initiate an exit by presenting a spend transaction and proving that the transaction is exitable. The user must submit a bond, `exit bond`, for starting this action. This bond is later used to cover the cost for other users to publish statements about the canonicity of the transaction in question.
+Any user may initiate an exit by presenting a spend transaction and proving that the transaction is exitable.
+The user must submit a bond, `exit bond`, for starting this action.
+This bond is later used to cover the cost for other users to publish statements about the canonicity of the transaction in question.
 
-We provide several possible mechanisms that allow a user to prove a transaction is exitable. First, remember that deposit transactions are exitable by default. Two ways in which spend transactions can be proven exitable are as follows:
-1. The user may present the transaction along with each of the transactions that created the inputs to the transaction, a Merkle proof of inclusion for each of these transactions, and a signature from each input owner. The contract can then validate that these transactions are the correct ones, that they were included in the chain, that the signatures are correct, and that the exiting transaction is correctly formed. This proves the exitability of the transaction.
-2. The user may present the transaction along signatures the user claims to be valid. The contract can validate that the exiting transaction is correctly formed. Another user can challenge one of these signatures by presenting some transaction that created an input such that the true input owner did not sign the signature. In this case, the exit would be blocked entirely and the challenging user would receive `exit bond`.
+We provide several possible mechanisms that allow a user to prove a transaction is exitable.
+First, remember that deposit transactions are exitable by default.
+Two ways in which spend transactions can be proven exitable are as follows:
+1. The user may present the transaction along with each of the transactions that created the inputs to the transaction, a Merkle proof of inclusion for each of these transactions, and a signature from each input owner.
+The contract can then validate that these transactions are the correct ones, that they were included in the chain, that the signatures are correct, and that the exiting transaction is correctly formed.
+This proves the exitability of the transaction.
+2. The user may present the transaction along signatures the user claims to be valid.
+The contract can validate that the exiting transaction is correctly formed.
+Another user can challenge one of these signatures by presenting some transaction that created an input such that the true input owner did not sign the signature.
+In this case, the exit would be blocked entirely and the challenging user would receive `exit bond`.
 
-Option (1) checks that a transaction is exitable when the exit is started. This has lower communication cost and complexity but higher up-front gas cost. This option also ensures that only a single exit on any given transaction can exist at any point in time.
-Option (2) allows a user to assert that a transaction is exitable, but leaves the proof to a challenge-response game. This is cheaper up-front but adds complexity. This option must permit multiple exits on the same transaction, as some exits may provide invalid signatures.
+Option (1) checks that a transaction is exitable when the exit is started.
+This has lower communication cost and complexity but higher up-front gas cost.
+This option also ensures that only a single exit on any given transaction can exist at any point in time.
+Option (2) allows a user to assert that a transaction is exitable, but leaves the proof to a challenge-response game.
+This is cheaper up-front but adds complexity.
+This option must permit multiple exits on the same transaction, as some exits may provide invalid signatures.
 
-These are not the only possible mechanisms that prove a transaction is exitable. There may be further ways to optimize these two options.
+These are not the only possible mechanisms that prove a transaction is exitable.
+There may be further ways to optimize these two options.
 
-We still need to provide a deterministic ordering of exits by some priority. MoreVP exits are given a priority based on the position in the Plasma chain of the most recently included (youngest) input to that transaction. Unlike the MVP protocol, we give each input and output to a transaction the same priority. This should be implemented by inserting a single “exit” object into a priority queue of exits and tracking a list of inputs or outputs to be paid out once the exit is processed. 
+We still need to provide a deterministic ordering of exits by some priority.
+MoreVP exits are given a priority based on the position in the Plasma chain of the most recently included (youngest) input to that transaction.
+Unlike the MVP protocol, we give each input and output to a transaction the same priority.
+This should be implemented by inserting a single “exit” object into a priority queue of exits and tracking a list of inputs or outputs to be paid out once the exit is processed.
 
 
 #### Proving Canonicity
 
-Whether unspent inputs or unspent outputs are paid out in an exit depends on the canonicity of the referenced transaction. Unfortunately it’s too expensive to directly prove that a transaction is or is not canonical. Instead, we assume that the referenced transaction is canonical by default and allow a series of challenges and responses to determine the true canonicity of the transaction.
+Whether unspent inputs or unspent outputs are paid out in an exit depends on the canonicity of the referenced transaction.
+Unfortunately it’s too expensive to directly prove that a transaction is or is not canonical.
+Instead, we assume that the referenced transaction is canonical by default and allow a series of challenges and responses to determine the true canonicity of the transaction.
 
-The process of determining canonicity involves a challenge-response game. In the first period of the exit, any user may reveal a competing transaction that potentially makes the exiting transaction non-canonical. This competing transaction must be exitable, must share an input with the exiting transaction, and must be included in the Plasma chain. Multiple competing transactions can be revealed during this period, but only the oldest presented transaction is considered for the purposes of a response.
+The process of determining canonicity involves a challenge-response game.
+In the first period of the exit, any user may reveal a competing transaction that potentially makes the exiting transaction non-canonical.
+This competing transaction must be exitable, must share an input with the exiting transaction, and must be included in the Plasma chain.
+Multiple competing transactions can be revealed during this period, but only the oldest presented transaction is considered for the purposes of a response.
 
-If any transactions have been presented during the first period, any other user can respond to the challenge by proving that the exiting transaction is actually included in the chain before the oldest presented competing transaction. If this response is given, then the exiting transaction is determined to be canonical and the responder receives the `exit bond` placed by the user who started the exit. Otherwise, the exiting transaction is determined to be non-canonical and the challenger receives `exit bond`.
+If any transactions have been presented during the first period, any other user can respond to the challenge by proving that the exiting transaction is actually included in the chain before the oldest presented competing transaction.
+If this response is given, then the exiting transaction is determined to be canonical and the responder receives the `exit bond` placed by the user who started the exit.
+Otherwise, the exiting transaction is determined to be non-canonical and the challenger receives `exit bond`.
 
-Note that this challenge means it’s possible for an honest user to lose `exit bond` as they might not be aware their transaction is non-canonical. We address this attack vector and several mitigations in detail later.
+Note that this challenge means it’s possible for an honest user to lose `exit bond` as they might not be aware their transaction is non-canonical.
+We address this attack vector and several mitigations in detail later.
 
 
 #### Joining an Exit
 
-As noted earlier, it’s possible that some participants in a transaction may not be aware that the transaction is non-canonical. Owners of both inputs and outputs to a transaction may want to start an exit in the case that they would receive the funds from the exit. However, we want to avoid the gas cost of repeatedly publishing and proving statements about the same transaction. We therefore allow owners of inputs or outputs to a transaction to join (“piggyback”) an existing exit that references the transaction. This effectively “caches” the result of the “exitable” and “canonical” checks. 
+As noted earlier, it’s possible that some participants in a transaction may not be aware that the transaction is non-canonical.
+Owners of both inputs and outputs to a transaction may want to start an exit in the case that they would receive the funds from the exit.
+However, we want to avoid the gas cost of repeatedly publishing and proving statements about the same transaction.
+We therefore allow owners of inputs or outputs to a transaction to join (“piggyback”) an existing exit that references the transaction.
+This effectively “caches” the result of the “exitable” and “canonical” checks.
 
-Users must join an exit within the first period. To join an exit, an input or output owner places a bond, `piggyback bond`. This bond is used to cover the cost of challenges that show the input or output is spent. A successful challenge blocks the specified input or output from exiting. These challenges must be presented before the end of the second period. 
+Users must join an exit within the first period.
+To join an exit, an input or output owner places a bond, `piggyback bond`.
+This bond is used to cover the cost of challenges that show the input or output is spent.
+A successful challenge blocks the specified input or output from exiting.
+These challenges must be presented before the end of the second period.
 
-Note that it isn’t mandatory to piggyback an exit. Users who choose not to join an exit are choosing not to attempt a withdrawal of their funds. If the chain is byzantine, not piggybacking could potentially mean loss of funds.
+Note that it isn’t mandatory to piggyback an exit.
+Users who choose not to join an exit are choosing not to attempt a withdrawal of their funds.
+If the chain is byzantine, not piggybacking could potentially mean loss of funds.
 
 
 ### Attack Vectors and Mitigations
 
 #### Honest Exit Bond Slashing
 
-It’s possible for an honest user to start an exit and have their exit bond slashed. This can occur if one of the inputs to a transaction is malicious and signs a second transaction spending the same input. 
+It’s possible for an honest user to start an exit and have their exit bond slashed.
+This can occur if one of the inputs to a transaction is malicious and signs a second transaction spending the same input.
 
 The following scenario demonstrates this attack: 
 1. Mallory spends `UTXO1` in `TX1` to Bob, creating `UTXO2`.
@@ -153,26 +232,35 @@ The following scenario demonstrates this attack: 
 7. No one is able to respond to the challenge in period 2, so `TX1` is determined to be non-canonical.
 8. After period 2, Mallory receives Bob’s `exit bond`.
 
-Mallory has therefore caused Bob to lose `exit bond`, even though Bob was acting honestly. We want to mitigate the impact of this attack as much as possible so that this does not prevent users from receiving funds. 
+Mallory has therefore caused Bob to lose `exit bond`, even though Bob was acting honestly.
+We want to mitigate the impact of this attack as much as possible so that this does not prevent users from receiving funds.
  
 
-##### Mitigations
+##### Mitigations for Honest Exit Bond Slashing
 
 ###### Bond Sharing
 
-One way to partially mitigate this attack is for each user who piggybacks to cover some portion of `exit bond`. This cuts the per-person value of `exit bond` proportionally to the number of users who have piggybacked. 
+One way to partially mitigate this attack is for each user who piggybacks to cover some portion of `exit bond`.
+This cuts the per-person value of `exit bond` proportionally to the number of users who have piggybacked.
 
 
 ###### Small Exit Bond
 
-The result of the above attack is that users may not exit from an in-flight transaction if the gas cost of exiting plus the value of `exit bond` is greater than the value of their input or output. We can reduce the impact of this attack by minimizing the gas cost of exiting and the value of `exit bond`. Gas cost should be highly optimized in any case, so the value of `exit bond` is of more importance.
+The result of the above attack is that users may not exit from an in-flight transaction if the gas cost of exiting plus the value of `exit bond` is greater than the value of their input or output.
+We can reduce the impact of this attack by minimizing the gas cost of exiting and the value of `exit bond`.
+Gas cost should be highly optimized in any case, so the value of `exit bond` is of more importance.
 
-`exit bond` is necessary to incentivize challenges. However, we believe that challenges can be sufficiently incentivized if `exit bond` simply covers the gas cost of challenging. Observations from the Bitcoin and Ethereum ecosystems suggest that sufficiently many nodes will verify transactions without a direct in-protocol incentive to do so. Our system requires only a single node be properly incentivized to challenge, and it’s likely that many node operators will have strong external incentives. Modeling the “correct” size of the exit bond is an ongoing area of research.
+`exit bond` is necessary to incentivize challenges.
+However, we believe that challenges can be sufficiently incentivized if `exit bond` simply covers the gas cost of challenging.
+Observations from the Bitcoin and Ethereum ecosystems suggest that sufficiently many nodes will verify transactions without a direct in-protocol incentive to do so.
+Our system requires only a single node be properly incentivized to challenge, and it’s likely that many node operators will have strong external incentives.
+Modeling the “correct” size of the exit bond is an ongoing area of research.
 
 
 ###### Timeouts
 
-We can add timeouts to each transaction (“must be included in the chain by block X”) to reduce number of vulnerable transactions at any point in time. This will probably also be necessary from a user experience point of view, as we don’t want users to accidentally sign a double-spend simply because the first transaction hasn’t been processed yet.
+We can add timeouts to each transaction (“must be included in the chain by block X”) to reduce number of vulnerable transactions at any point in time.
+This will probably also be necessary from a user experience point of view, as we don’t want users to accidentally sign a double-spend simply because the first transaction hasn’t been processed yet.
 
 
 ## Alice-Bob Scenarios
@@ -181,11 +269,13 @@ We can add timeouts to each transaction (“must be included in the chain by blo
 
 1. Alice spends `UTXO1` in `TX1` to Bob, creating `UTXO2`.
 2. `TX1` is in-flight.
-3. Operator begins withholding blocks while `TX1` is still in-flight. Neither Alice nor Bob know if the transaction has been included in a block.
+3. Operator begins withholding blocks while `TX1` is still in-flight.
+Neither Alice nor Bob know if the transaction has been included in a block.
 4. Someone with access to `TX1` (Alice, Bob, or otherwise) starts an exit referencing `TX1` and places `exit bond`.
 5. Alice and Bob piggyback onto the exit and each place `piggyback bond`.
 6. Alice is honest, so she hasn’t spent `UTXO1` in any transaction other than `TX1`.
-7. After period 2, Bob receives the value of `UTXO2`. All bonds are refunded.
+7. After period 2, Bob receives the value of `UTXO2`.
+All bonds are refunded.
 
 
 ### Mallory tries to exit a spent output:
@@ -195,7 +285,8 @@ We can add timeouts to each transaction (“must be included in the chain by blo
 3. Mallory spends `UTXO2` in `TX2`.
 4. Mallory starts an exit referencing `TX1` and places `exit bond`.
 5. Mallory piggybacks onto the exit and places `piggyback bond`.
-6. In period 2, someone reveals `TX2` spending `UTXO2`. This challenger receives Mallory’s `piggyback bond`.
+6. In period 2, someone reveals `TX2` spending `UTXO2`.
+This challenger receives Mallory’s `piggyback bond`.
 7. Alice is honest, so she hasn’t spent `UTXO1` in any transaction other than `TX1`.
 8. After period 2, Mallory’s `exit bond` is refunded.
 
@@ -204,14 +295,17 @@ We can add timeouts to each transaction (“must be included in the chain by blo
 
 1. Mallory spends `UTXO1` in `TX1` to Bob, creating `UTXO2`.
 2. `TX1` is in-flight.
-3. Operator begins withholding blocks while `TX1` is still in-flight. Neither Mallory nor Bob know if the transaction has been included in a block.
-4. Mallory spends `UTXO1` in `TX2`. 
-5. `TX2` is included in a withheld block. `TX1` is not included in a block.
+3. Operator begins withholding blocks while `TX1` is still in-flight.
+Neither Mallory nor Bob know if the transaction has been included in a block.
+4. Mallory spends `UTXO1` in `TX2`.
+5. `TX2` is included in a withheld block.
+`TX1` is not included in a block.
 6. Bob starts an exit referencing `TX1` and places `exit bond`.
 7. Bob piggybacks onto the exit and places `piggyback bond`.
 8. In period 1, someone challenges the canonicity of `TX1` by revealing `TX2`.
 9. No one is able to respond to the challenge in period 2, so `TX1` is determined to be non-canonical.
-10. After period 2, Bob’s `piggyback bond` is refunded. The challenger receives Bob’s `exit bond`.
+10. After period 2, Bob’s `piggyback bond` is refunded.
+The challenger receives Bob’s `exit bond`.
 
 
 ### Mallory spends her input again later:
@@ -236,7 +330,7 @@ We can add timeouts to each transaction (“must be included in the chain by blo
 6. In period 1 of the exit for `TX1`, someone challenges the canonicity of `TX1` by revealing `TX2`.
 7. In period 1 of the exit for `TX2`, someone challenges the canonicity of `TX2` by revealing `TX1`.
 8. After period 2 of the exit for `TX1`, the challenger receives `exit bond`.
-9. After period 2 of the exit for `TX2`, the challenger receives `exit bond.
+9. After period 2 of the exit for `TX2`, the challenger receives `exit bond`.
 
 
 ### Operator tries to steal funds from an included transaction
@@ -248,8 +342,10 @@ We can add timeouts to each transaction (“must be included in the chain by blo
 5. Operator starts an exit referencing `TX3` and places `exit bond`.
 6. Operator piggybacks onto the exit and places `piggyback bond`.
 7. Bob starts a *standard* exit for `UTXO2`.
-8. Operator’s exit will process will have priority of position of `UTXO3`. Bob’s exit will have priority of position of `UTXO2`.
-9. Bob’s exit processes first, Operator’s exit processes second. All bonds are refunded.
+8. Operator’s exit will process will have priority of position of `UTXO3`.
+Bob’s exit will have priority of position of `UTXO2`.
+9. Bob’s exit processes first, Operator’s exit processes second.
+All bonds are refunded.
 
 
 ### Operator tries to steal funds from an in-flight transaction.
@@ -263,8 +359,10 @@ We can add timeouts to each transaction (“must be included in the chain by blo
 7. Bob starts an exit referencing `TX1` and places `exit bond`.
 8. Bob piggybacks onto the exit and places `piggyback bond`.
 9. Alice is honest, so she hasn’t spent `UTXO1` in any transaction other than `TX1`.
-10. Operator’s exit will process will have priority of position of `UTXO3`. Bob’s exit will have priority of position of `UTXO1`.
-11. Bob’s exit processes first, Operator’s exit processes second. All bonds are refunded.
+10. Operator’s exit will process will have priority of position of `UTXO3`.
+Bob’s exit will have priority of position of `UTXO1`.
+11. Bob’s exit processes first, Operator’s exit processes second.
+All bonds are refunded.
 
 
 ## Appendix
@@ -273,7 +371,8 @@ We can add timeouts to each transaction (“must be included in the chain by blo
 
 #### Transactions
 
-$TX$ is the transaction space, where each transaction has $inputs$ and $outputs. For simplicity, each input and output is an integer that represents the position of that input or output in the Plasma chain.
+$TX$ is the transaction space, where each transaction has $inputs$ and $outputs.
+For simplicity, each input and output is an integer that represents the position of that input or output in the Plasma chain.
 
 $$
 TX: ((I_1, I_2, … ,I_n), (O_1, O_2, … ,O_m))
@@ -289,7 +388,8 @@ $$
 
 #### Chain
 
-A Plasma chain is composed of transactions. For each Plasma chain $T$, we define a mapping between each transaction position and the corresponding transaction at that position. 
+A Plasma chain is composed of transactions.
+For each Plasma chain $T$, we define a mapping between each transaction position and the corresponding transaction at that position.
 
 $$
 T_n: [1, n] \rightarrow TX
@@ -310,7 +410,7 @@ $$
 competing(t, t’) = I(t) \cap I(t’) \neg \varnothing
 $$
 
-The set of competitors to a transaction is therefore every other transaction competing with the transaction in question. 
+The set of competitors to a transaction is therefore every other transaction competing with the transaction in question.
 
 $$
 competitors(t) = \{ t_{i} : i \in (0, n], competing(t_{i}, t) \}
@@ -319,7 +419,8 @@ $$
 
 #### Canonical Transaction
 
-A transaction is called “canonical” if it’s oldest of all its competitors. We define a function $first$ that determines which of a set $T$ of transactions is the oldest transaction.
+A transaction is called “canonical” if it’s oldest of all its competitors.
+We define a function $first$ that determines which of a set $T$ of transactions is the oldest transaction.
 
 $$
 first(T) = t \in T : \forall t’ \in T, t \neq t’, min(O(t)) < min(O(t’))	
@@ -340,7 +441,9 @@ $$
 
 #### Unspent, Double Spent
 
-We define two helper functions $unspent$ and $double\_spent$. $unspent$ takes a set of transactions and returns the list of transaction outputs that haven't been spent. $double\_spent$ takes a list of transactions and returns any outputs that have been used as inputs to more than one transaction.
+We define two helper functions $unspent$ and $double\_spent$.
+$unspent$ takes a set of transactions and returns the list of transaction outputs that haven't been spent.
+$double\_spent$ takes a list of transactions and returns any outputs that have been used as inputs to more than one transaction.
 
 First, we define a function $txo$ that takes a transaction and returns a list of its inputs and outputs.
 
@@ -368,7 +471,8 @@ $$
 
 #### Safety
 
-The safety rule, in English, says "if an output was exitable at some time and is not spent in a later transaction, then it must still be exitable". If we didn't have this condition, then it might be possible for a user to receive money but not be able to spend or exit from it later.
+The safety rule, in English, says "if an output was exitable at some time and is not spent in a later transaction, then it must still be exitable".
+If we didn't have this condition, then it might be possible for a user to receive money but not be able to spend or exit from it later.
 
 Formally, if we say that $E(T_{n})$ represents the set of exitable outputs for some Plasma chain and $T_{n+1}$ is $T_{n}$ plus some new transaction $t_{n+1}$:
 
@@ -381,7 +485,8 @@ $$
 
 The liveness rule states that "if an output was exitable at some time and *is* spent later, then immediately after that spend, either it's still exitable or all of the spend's outputs are exitable, but not both".
 
-The second part ensures that something is spent, then all the resulting outputs should be exitable. The first case is special - if the spend is invalid, then the outputs should not be exitable and the input should still be exitable.
+The second part ensures that something is spent, then all the resulting outputs should be exitable.
+The first case is special - if the spend is invalid, then the outputs should not be exitable and the input should still be exitable.
 
 $$
 \forall o \in E(T_{n}), o \in I(t_{n+1}) \implies o \in E(T_{n+1}) \oplus O(t_{m+1}) \subseteq E(T_{n+1})
@@ -399,7 +504,9 @@ $$
 
 ##### Priority
 
-Exits are ordered by a given priority number. An exit with a lower priority number will process before an exit with a higher priority number. We define the priority of an exit from a transaction $t$, $p(t)$, as:
+Exits are ordered by a given priority number.
+An exit with a lower priority number will process before an exit with a higher priority number.
+We define the priority of an exit from a transaction $t$, $p(t)$, as:
 
 $$
 p(t) = \max(I(t))
@@ -416,9 +523,12 @@ $$
 \forall o \in E(T_{n}), o \not\in I(t_{n+1}) \implies o \in E(T_{n+1})
 $$
 
-So to prove this for our $E(T_{n})$, let's take some $o \in E(T_{n})$. From our definition, $o$ must be in $unspent(reality(T_{n}))$, and must not be in $double\_spent(T_{n})$.
+So to prove this for our $E(T_{n})$, let's take some $o \in E(T_{n})$.
+From our definition, $o$ must be in $unspent(reality(T_{n}))$, and must not be in $double\_spent(T_{n})$.
 
-$o \not\in I(t_{n+1})$ means that $o$ will still be in $reality$, because only a transaction spending $o$ can impact its inclusion in $reality$. Also, $o$ can't be spent (or double spent) if it wasn't used as an input. So our function is safe!
+$o \not\in I(t_{n+1})$ means that $o$ will still be in $reality$, because only a transaction spending $o$ can impact its inclusion in $reality$.
+Also, $o$ can't be spent (or double spent) if it wasn't used as an input.
+So our function is safe!
 
 
 #### Liveness
@@ -429,14 +539,17 @@ $$
 \forall o \in E(T_{n}), o \in I(t_{n+1}) \implies o \in E(T_{n+1}) \oplus O(t_{n+1}) \subseteq E(T_{n+1})
 $$
 
-However, *we do have a case for which liveness does not hold* - namely that if the second transaction is a non-canonical double spend, then both the input and all of the outputs will not be exitable. This is a result of the $\setminus double\_spent(T_{n})$ clause. We think this is fine, because it means that only double spent inputs are at risk of being "lost". 
+However, *we do have a case for which liveness does not hold* - namely that if the second transaction is a non-canonical double spend, then both the input and all of the outputs will not be exitable.
+This is a result of the $\setminus double\_spent(T_{n})$ clause.
+We think this is fine, because it means that only double spent inputs are at risk of being "lost".
 
 The updated property is therefore:
  $$
 \forall o \in E(T_{n}), o \in I(t_{n+1}) \implies o \in E(T_{n+1}) \oplus O(t_{n+1}) \subseteq E(T_{n+1}) \oplus  o \in double\_spent(T_{n+1})
 $$
 
-This is more annoying to prove, because we need to show each implication holds separately, but not together. Basically, given $\forall o \in E(T_{n}), o \in I(t_{n+1})$, we need:
+This is more annoying to prove, because we need to show each implication holds separately, but not together.
+Basically, given $\forall o \in E(T_{n}), o \in I(t_{n+1})$, we need:
 
 $$
 o \in E(T_{n+1}) \implies O(t_{n+1}) \cap E(T_{n+1}) = \varnothing \wedge  o \not\in double\_spent(T_{n+1})
@@ -454,13 +567,25 @@ $$
 o \in double\_spent(T_{n+1}) \implies O(t_{n+1}) \cap E(T_{n+1}) = \varnothing \wedge o \not\in E(T_{n+1})
 $$
 
-Let's show the first. $o \in I(t_{n+1})$ means $o$ was spent in $t_{n+1}$. However, $o \in E(T_{n+1})$ means that it's unspent in any canonical transaction. Therefore, $t_{n+1}$ cannot be a canonical transaction. $O(t_{n+1}) \cap E(T_{n+1})$ is empty if $t_{n+1}$ is not canonical, so we've shown the half. Our specification states that $o \in double\_spent(T_{n+1}) \implies o \not\in E(T_{n+1})$, so we can show the second half by looking at the contrapositive of that statement $o \in E(T_{n+1}) \implies o \not\in double\_spent(T_{n+1})$.
+Let's show the first.
+$o \in I(t_{n+1})$ means $o$ was spent in $t_{n+1}$.
+However, $o \in E(T_{n+1})$ means that it's unspent in any canonical transaction.
+Therefore, $t_{n+1}$ cannot be a canonical transaction.
+$O(t_{n+1}) \cap E(T_{n+1})$ is empty if $t_{n+1}$ is not canonical, so we've shown the half.
+Our specification states that $o \in double\_spent(T_{n+1}) \implies o \not\in E(T_{n+1})$, so we can show the second half by looking at the contrapositive of that statement $o \in E(T_{n+1}) \implies o \not\in double\_spent(T_{n+1})$.
 
-Next, we'll show the second statement. $O(t_{n+1}) \subseteq E(T_{n+1})$ implies that $t_{n+1}$ is canonical. If $t_{n+1}$ is canonical, and $o$ is an input to $t_{n+1}$, then $o$ is no longer unspent, and therefore $o \not\in E(T_{n+1})$. If $t$ is canonical then there cannot exist another earlier spend of the input, so  $o \not\in double\_spent(T_{n+1})$.
+Next, we'll show the second statement.
+$O(t_{n+1}) \subseteq E(T_{n+1})$ implies that $t_{n+1}$ is canonical.
+If $t_{n+1}$ is canonical, and $o$ is an input to $t_{n+1}$, then $o$ is no longer unspent, and therefore $o \not\in E(T_{n+1})$.
+If $t$ is canonical then there cannot exist another earlier spend of the input, so  $o \not\in double\_spent(T_{n+1})$.
 
-Now the third statement. $o \in double\_spent(T_{n+1})$ means $t$ is necessarily not canonical, so we have $O(t_{n+1}) \cap E(T_{n+1}) = \varnothing$. It also means that $o \not\in E(T_{n+1})$ because of our $\setminus double\_spent(T_{n})$ clause.
+Now the third statement.
+$o \in double\_spent(T_{n+1})$ means $t$ is necessarily not canonical, so we have $O(t_{n+1}) \cap E(T_{n+1}) = \varnothing$.
+It also means that $o \not\in E(T_{n+1})$ because of our $\setminus double\_spent(T_{n})$ clause.
 
-Finally, we'll show that at least one of these must be true. Let's do a proof by contradiction. Assume the following:
+Finally, we'll show that at least one of these must be true.
+Let's do a proof by contradiction.
+Assume the following:
 
 $$
  O(t_{n+1}) \cap E(T_{n+1}) = \varnothing \wedge o \not\in E(T_{n+1}) \wedge  o \not\in double\_spent(T_{n+1})
@@ -491,7 +616,9 @@ Therefore we've shown the statement by contradiction.
 
 #### Exit Ordering
 
-Let $t_{v}$ be some valid transaction and $t_{iv}$ be the first invalid, but still exitable and canonical, transaction in the chain. $t_{iv}$ must either be a deposit transaction or spend some input that didn’t exist when $t_{v}$ was created, otherwise $t_{iv}$ would be valid. Therefore:
+Let $t_{v}$ be some valid transaction and $t_{iv}$ be the first invalid, but still exitable and canonical, transaction in the chain.
+$t_{iv}$ must either be a deposit transaction or spend some input that didn’t exist when $t_{v}$ was created, otherwise $t_{iv}$ would be valid.
+Therefore:
 
 $$
 \max(I(t_{v})) < \max(I(t_{iv}))
@@ -503,7 +630,9 @@ $$
 p(t_{v}) < p(t_{iv})
 $$
 
-So $p(t_{v})$ will exit before $p(t_{iv})$. We now need to show that for any $t'$ that stems from $t_{iv}$, $p(t_{v}) < p(t')$ as well. Because $t'$ stems from $t_{iv}$, we know that:
+So $p(t_{v})$ will exit before $p(t_{iv})$.
+We now need to show that for any $t'$ that stems from $t_{iv}$, $p(t_{v}) < p(t')$ as well.
+Because $t'$ stems from $t_{iv}$, we know that:
 
 $$
 (O(t_{iv}) \cap I(t') \neq \varnothing) \vee (\exists t : stems\_from(t_{iv}, t) \wedge stems\_from(t, t'))
@@ -515,4 +644,5 @@ $$
 p(t') = \max(I(t')) \geq \max(I(t') \cap O(t_{iv})) \geq \min(O(t_{iv})) > \max(I(t_{iv})) = p(t_{iv})
 $$
 
-Otherwise, there's a chain of transactions from $p_{iv}$ to $p'$ for which the first is true, and therefore the inequality holds by transitivity. Therefore, all exiting outputs created by valid transactions will exit before any output created by an invalid transaction.
+Otherwise, there's a chain of transactions from $p_{iv}$ to $p'$ for which the first is true, and therefore the inequality holds by transitivity.
+Therefore, all exiting outputs created by valid transactions will exit before any output created by an invalid transaction.
