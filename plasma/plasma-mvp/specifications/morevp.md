@@ -32,21 +32,21 @@ A formal treatment of the protocol is presented in the appendix.
 
 ### Definitions
 
-#### Deposit Transaction
-
-A deposit transaction is a special type of transaction that creates a new balance on the Plasma chain.
-This is similar to a Bitcoin "coinbase" transaction.
-In practice, this takes the form of a transaction with a single “special” input.
-
-
 #### Spend Transaction
 
 A spend transaction is any transaction that spends a UTXO present on the Plasma chain.
 
 
+#### Deposit
+
+A deposit creates a new output on the Plasma chain.
+Although deposits are typically represented as transactions that spend some "special" input, we do not treat deposits as transactions for the purpose of the MoreVP exit protocol.
+
+
 #### In-flight Transaction
 
 A transaction is considered to be “in-flight” if it has been broadcast but has not yet been included in the Plasma chain.
+A transaction may be in-flight from the perspective of an individual user if that user does not have access to the block in which the transaction is included. 
 
 
 #### Competing Transaction, Competitors
@@ -72,21 +72,20 @@ If the other transaction is not included in the chain, then we can’t tell whic
 #### Exitable Transaction
 
 If a transaction is “exitable,” then a user may attempt to start an exit that references the transaction.
-All deposit transactions are “exitable” by default.
 A spend transaction can be called “exitable” if the transaction is correctly formed (e.g. more input value than output value, inputs older than outputs, proper structure) and is properly signed by the owners of the transaction’s inputs.
 
 
 #### Valid Transaction
 
-A deposit transaction is “valid” if and only if it corresponds exactly to a single deposit on the root chain and is the first deposit transaction to correspond to that deposit.
 A spend transaction is “valid” if and only if it is exitable, canonical, and only stems from valid transactions (i.e. all transactions in the history are also valid transactions).
 Note that a transaction would therefore be considered invalid if even a single invalid transaction is present in its history.
 An exitable transaction is not necessarily a valid transaction, but all valid transactions are, by definition, exitable.
 
 
-### Basic Specification
+### Desired Exit Mechanism
 
 The MoreVP exit protocol allows the owners of both inputs and outputs to a transaction to attempt an exit.
+We want to design a mechanism that allows these inputs and outputs to be withdrawn under the following conditions.
 
 The owner of an input `in` to a transaction `tx` must prove that:
 1. `tx` is exitable.
@@ -103,10 +102,10 @@ The owner of an output `out` to a transaction `tx` must prove that:
 
 The above game correctly selects the inputs or outputs that are eligible to exit.
 However, we still need to enforce an ordering on exits to ensure that all outputs created by valid transactions will be paid out before any output created by an invalid transaction.
-We do this by ordering every exit by the position of the *youngest input* to the transaction referenced in each exit.
+We do this by ordering every exit by the position of the *youngest input* to the transaction referenced in each exit, regardless of whether an input or an output is being exited.
 
 
-## Exit Protocol Implementation
+## Exit Protocol
 
 ### Motivation
 
@@ -118,7 +117,6 @@ The implementation is designed to be deployed to Ethereum and, as a result, some
 Additionally, the MoreVP exit protocol is not necessary in all cases.
 Previous work shows that we can use the Plasma MVP exit protocol without confirmation signatures for any transaction included before an invalid (or, in the case of withheld blocks, potentially invalid) transaction.
 We therefore only need to make use of the MoreVP protocol for the set transactions that are in-flight when a Plasma chain becomes byzantine.
-This also means that we can force deposit transactions to use the Plasma MVP exit protocol as these transactions would never be in-flight.
 
 The MoreVP protocol guarantees that if transaction is exitable then either the unspent inputs or unspent outputs can be withdrawn.
 Whether the inputs or outputs can be withdrawn depends on if the transaction is canonical.
@@ -127,7 +125,7 @@ This can occur if the owner of an input to an in-flight transaction is malicious
 
 To account for this problem, we allow exits to be ambiguous about canonicity.
 Users can start MoreVP exits with the *assumption* that the referenced transaction is canonical.
-Other owners of inputs or outputs to the transaction can then join (or “piggyback”) the exit.
+Other owners of inputs or outputs to the transaction can then “piggyback" the exit.
 We add cryptoeconomic mechanisms that determine whether the transaction is canonical and which of the inputs or outputs are unspent.
 The end result is that we can correctly determine which inputs or outputs should be paid out.
 
@@ -138,22 +136,20 @@ The end result is that we can correctly determine which inputs or outputs should
 
 The MoreVP exit protocol requires the use of a “challenge-response” mechanism, whereby users can submit a challenge but are subject to a response that invalidates the challenge.
 To give users enough time to respond to a challenge, the exit process is split into two “periods.” When challenges are subject to a response, we require that the challenges be submitted before the end of the first exit period and that responses be submitted before the end of the second.
-We define each period to have a length of half the minimum exit period (MEP).
-Currently, the MEP is set to 7 days, so each period has a length of 3.5 days.
+We define each period to have a length of half the minimum finalization period (MFP).
+Currently, the MFP is set to 7 days, so each period has a length of 3.5 days.
 
 
 #### Starting the Exit
 
-For simplicity, we block deposit transactions from using the MoreVP exit protocol.
 
 Any user may initiate an exit by presenting a spend transaction and proving that the transaction is exitable.
 The user must submit a bond, `exit bond`, for starting this action.
 This bond is later used to cover the cost for other users to publish statements about the canonicity of the transaction in question.
 
 We provide several possible mechanisms that allow a user to prove a transaction is exitable.
-First, remember that deposit transactions are exitable by default.
 Two ways in which spend transactions can be proven exitable are as follows:
-1. The user may present the transaction along with each of the transactions that created the inputs to the transaction, a Merkle proof of inclusion for each of these transactions, and a signature from each input owner.
+1. The user may present `tx` along with each of the `input_tx1, input_tx2, ... , input_txn` that created the inputs to the transaction, a Merkle proof of inclusion for each `input_tx`, and a signature over `tx` from the `newowner` of each `input_tx`.
 The contract can then validate that these transactions are the correct ones, that they were included in the chain, that the signatures are correct, and that the exiting transaction is correctly formed.
 This proves the exitability of the transaction.
 2. The user may present the transaction along signatures the user claims to be valid.
@@ -168,6 +164,8 @@ Option (2) allows a user to assert that a transaction is exitable, but leaves th
 This is cheaper up-front but adds complexity.
 This option must permit multiple exits on the same transaction, as some exits may provide invalid signatures.
 
+<!-- TODO: Groom this section once we decide on (1) or (2) -->
+
 These are not the only possible mechanisms that prove a transaction is exitable.
 There may be further ways to optimize these two options.
 
@@ -179,40 +177,151 @@ This should be implemented by inserting a single “exit” object into a priori
 
 #### Proving Canonicity
 
-Whether unspent inputs or unspent outputs are paid out in an exit depends on the canonicity of the referenced transaction.
+Whether unspent inputs or unspent outputs are paid out in an exit depends on the canonicity of the referenced transaction, independent of any piggybacking by other users.
 Unfortunately it’s too expensive to directly prove that a transaction is or is not canonical.
 Instead, we assume that the referenced transaction is canonical by default and allow a series of challenges and responses to determine the true canonicity of the transaction.
 
 The process of determining canonicity involves a challenge-response game.
 In the first period of the exit, any user may reveal a competing transaction that potentially makes the exiting transaction non-canonical.
-This competing transaction must be exitable, must share an input with the exiting transaction, and must be included in the Plasma chain.
+This competing transaction must be exitable and must share an input with the exiting transaction, but does not have to be included in the Plasma chain.
 Multiple competing transactions can be revealed during this period, but only the oldest presented transaction is considered for the purposes of a response.
 
 If any transactions have been presented during the first period, any other user can respond to the challenge by proving that the exiting transaction is actually included in the chain before the oldest presented competing transaction.
-If this response is given, then the exiting transaction is determined to be canonical and the responder receives the `exit bond` placed by the user who started the exit.
+If this response is given before the end of the second period, then the exiting transaction is determined to be canonical and the responder receives the `exit bond` placed by the user who started the exit.
 Otherwise, the exiting transaction is determined to be non-canonical and the challenger receives `exit bond`.
 
 Note that this challenge means it’s possible for an honest user to lose `exit bond` as they might not be aware their transaction is non-canonical.
 We address this attack vector and several mitigations in detail later.
 
+<!-- TODO: Include image of canonicity "state machine" -->
 
-#### Joining an Exit
+
+#### Piggybacking an Exit
 
 As noted earlier, it’s possible that some participants in a transaction may not be aware that the transaction is non-canonical.
 Owners of both inputs and outputs to a transaction may want to start an exit in the case that they would receive the funds from the exit.
 However, we want to avoid the gas cost of repeatedly publishing and proving statements about the same transaction.
-We therefore allow owners of inputs or outputs to a transaction to join (“piggyback”) an existing exit that references the transaction.
-This effectively “caches” the result of the “exitable” and “canonical” checks.
+We therefore allow owners of inputs or outputs to a transaction to piggyback an existing exit that references the transaction.
 
-Users must join an exit within the first period.
-To join an exit, an input or output owner places a bond, `piggyback bond`.
+Users must piggyback an exit within the first period.
+To piggyback an exit, an input or output owner places a bond, `piggyback bond`.
 This bond is used to cover the cost of challenges that show the input or output is spent.
 A successful challenge blocks the specified input or output from exiting.
 These challenges must be presented before the end of the second period.
 
 Note that it isn’t mandatory to piggyback an exit.
-Users who choose not to join an exit are choosing not to attempt a withdrawal of their funds.
+Users who choose not to piggyback an exit are choosing not to attempt a withdrawal of their funds.
 If the chain is byzantine, not piggybacking could potentially mean loss of funds.
+
+
+#### Combining with Plasma MVP Exit Protocol
+
+The MoreVP protocol can be combined with the Plasma MVP protocol in a way that simultaneously preserves the integrity of exits and minimizes gas cost. 
+Owners of outputs on the Plasma chain should be able to start an exit via either mechanism, but not both.
+Although the two protocols use different determinations for exit priority, we still need a total ordering on exits.
+Therefore, every exit, no matter the protocol used, must be included in the same priority queue for processing.
+
+
+## Alice-Bob Scenarios
+
+### Alice & Bob are honest and cooperating:
+
+1. Alice spends `UTXO1` in `TX1` to Bob, creating `UTXO2`.
+2. `TX1` is in-flight.
+3. Operator begins withholding blocks while `TX1` is still in-flight.
+Neither Alice nor Bob know if the transaction has been included in a block.
+4. Someone with access to `TX1` (Alice, Bob, or otherwise) starts an exit referencing `TX1` and places `exit bond`.
+5. Alice and Bob piggyback onto the exit and each place `piggyback bond`.
+6. Alice is honest, so she hasn’t spent `UTXO1` in any transaction other than `TX1`.
+7. After period 2, Bob receives the value of `UTXO2`, Alice does not receive the value of `UTXO1`.
+All bonds are refunded.
+
+
+### Mallory tries to exit a spent output:
+
+1. Alice spends `UTXO1` in `TX1` to Mallory, creating `UTXO2`.
+2. `TX1` is included in block `N`.
+3. Mallory spends `UTXO2` in `TX2`.
+4. Mallory starts an exit referencing `TX1` and places `exit bond`.
+5. Mallory piggybacks onto the exit and places `piggyback bond`.
+6. In period 2, someone reveals `TX2` spending `UTXO2`.
+This challenger receives Mallory’s `piggyback bond`.
+7. Alice is honest, so she hasn’t spent `UTXO1` in any transaction other than `TX1`.
+8. After period 2, Mallory’s `exit bond` is refunded, no one exits any UTXOs.
+
+
+### Mallory double spends her input:
+
+1. Mallory spends `UTXO1` in `TX1` to Bob, creating `UTXO2`.
+2. `TX1` is in-flight.
+3. Operator begins withholding blocks while `TX1` is still in-flight.
+Neither Mallory nor Bob know if the transaction has been included in a block.
+4. Mallory spends `UTXO1` in `TX2`.
+5. `TX2` is included in a withheld block.
+`TX1` is not included in a block.
+6. Bob starts an exit referencing `TX1` and places `exit bond`.
+7. Bob piggybacks onto the exit and places `piggyback bond`.
+8. In period 1, someone challenges the canonicity of `TX1` by revealing `TX2`.
+9. No one is able to respond to the challenge in period 2, so `TX1` is determined to be non-canonical.
+10. After period 2, Bob’s `piggyback bond` is refunded, no one exits any UTXOs.
+The challenger receives Bob’s `exit bond`.
+
+
+### Mallory spends her input again later:
+
+1. Mallory spends `UTXO1` in `TX1` to Bob, creating `UTXO2`.
+2. `TX1` is included in block `N`.
+3. Mallory spends `UTXO1` in `TX2`.
+4. `TX2` is included in block `N+M`
+5. Mallory starts an exit referencing `TX1` and places `exit bond`.
+6. In period 1, someone challenges the canonicity of `TX1` by revealing `TX2`.
+7. In period 2, someone responds to the challenge by proving that `TX1` was included before `TX2`.
+8. After period 2, the user who responded to the challenge receives Mallory’s `exit bond`, no one exits any UTXOs.
+
+
+### Mallory attempts to exit a spent input:
+
+1. Mallory spends `UTXO1` and `UTXO2` in `TX1`.
+2. Mallory spends `UTXO1` in `TX2`.
+3. `TX1` and `TX2` are in-flight.
+4. Mallory starts an exit referencing `TX1` and places `exit bond`.
+5. Mallory starts an exit referencing `TX2` and places `exit bond`.
+6. In period 1 of the exit for `TX1`, someone challenges the canonicity of `TX1` by revealing `TX2`.
+7. In period 1 of the exit for `TX2`, someone challenges the canonicity of `TX2` by revealing `TX1`.
+8. After period 2 of the exit for `TX1`, the challenger receives `exit bond`, no one exits any UTXOs.
+9. After period 2 of the exit for `TX2`, the challenger receives `exit bond`, no one exits any UTXOs.
+
+
+### Operator tries to steal funds from an included transaction
+
+1. Alice spends `UTXO1` in `TX1` to Bob, creating `UTXO2`.
+2. `TX1` is included in (valid) block `N`.
+3. Operator creates invalid deposit, creating `UTXO3`.
+4. Operator spends `UTXO3` in `TX3`, creating `UTXO4`.
+5. Operator starts an exit referencing `TX3` and places `exit bond`.
+6. Operator piggybacks onto the exit and places `piggyback bond`.
+7. Bob starts a *standard* exit for `UTXO2`.
+8. Operator’s exit will have priority of position of `UTXO3`.
+Bob’s exit will have priority of position of `UTXO2`.
+9. Bob receives the value of `UTXO2` first, Operator receives the value of `UTXO4` second.
+All bonds are refunded.
+
+
+### Operator tries to steal funds from an in-flight transaction.
+
+1. Alice spends `UTXO1` in `TX1` to Bob, creating `UTXO2`.
+2. `TX1` is in-flight.
+3. Operator creates invalid deposit, creating `UTXO3`.
+4. Operator spends `UTXO3` in `TX3`, creating `UTXO4`.
+5. Operator starts an exit referencing `TX3` and places `exit bond`.
+6. Operator piggybacks onto the exit and places `piggyback bond`.
+7. Bob starts an exit referencing `TX1` and places `exit bond`.
+8. Bob piggybacks onto the exit and places `piggyback bond`.
+9. Alice is honest, so she hasn’t spent `UTXO1` in any transaction other than `TX1`.
+10. Operator’s exit will have priority of position of `UTXO3`.
+Bob’s exit will have priority of position of `UTXO1`.
+11. Bob receives the value of `UTXO2` first, Operator receives the value of `UTXO4` second.
+All bonds are refunded.
 
 
 ### Attack Vectors and Mitigations
@@ -222,7 +331,7 @@ If the chain is byzantine, not piggybacking could potentially mean loss of funds
 It’s possible for an honest user to start an exit and have their exit bond slashed.
 This can occur if one of the inputs to a transaction is malicious and signs a second transaction spending the same input.
 
-The following scenario demonstrates this attack: 
+The following scenario demonstrates this attack:
 1. Mallory spends `UTXO1` in `TX1` to Bob, creating `UTXO2`.
 2. `TX1` is in-flight.
 3. Operator begins withholding blocks while `TX1` is still in-flight.
@@ -230,7 +339,7 @@ The following scenario demonstrates this attack: 
 5. Mallory spends `UTXO1` in `TX2`.
 6. In period 1 of the exit for `TX1`, Mallory challenges the canonicity of `TX1` by revealing `TX2`.
 7. No one is able to respond to the challenge in period 2, so `TX1` is determined to be non-canonical.
-8. After period 2, Mallory receives Bob’s `exit bond`.
+8. After period 2, Mallory receives Bob’s `exit bond`, no one exits any UTXOs.
 
 Mallory has therefore caused Bob to lose `exit bond`, even though Bob was acting honestly.
 We want to mitigate the impact of this attack as much as possible so that this does not prevent users from receiving funds.
@@ -261,108 +370,6 @@ Modeling the “correct” size of the exit bond is an ongoing area of research.
 
 We can add timeouts to each transaction (“must be included in the chain by block X”) to reduce number of vulnerable transactions at any point in time.
 This will probably also be necessary from a user experience point of view, as we don’t want users to accidentally sign a double-spend simply because the first transaction hasn’t been processed yet.
-
-
-## Alice-Bob Scenarios
-
-### Alice & Bob are honest and cooperating:
-
-1. Alice spends `UTXO1` in `TX1` to Bob, creating `UTXO2`.
-2. `TX1` is in-flight.
-3. Operator begins withholding blocks while `TX1` is still in-flight.
-Neither Alice nor Bob know if the transaction has been included in a block.
-4. Someone with access to `TX1` (Alice, Bob, or otherwise) starts an exit referencing `TX1` and places `exit bond`.
-5. Alice and Bob piggyback onto the exit and each place `piggyback bond`.
-6. Alice is honest, so she hasn’t spent `UTXO1` in any transaction other than `TX1`.
-7. After period 2, Bob receives the value of `UTXO2`.
-All bonds are refunded.
-
-
-### Mallory tries to exit a spent output:
-
-1. Alice spends `UTXO1` in `TX1` to Mallory, creating `UTXO2`.
-2. `TX1` is included in block `N`.
-3. Mallory spends `UTXO2` in `TX2`.
-4. Mallory starts an exit referencing `TX1` and places `exit bond`.
-5. Mallory piggybacks onto the exit and places `piggyback bond`.
-6. In period 2, someone reveals `TX2` spending `UTXO2`.
-This challenger receives Mallory’s `piggyback bond`.
-7. Alice is honest, so she hasn’t spent `UTXO1` in any transaction other than `TX1`.
-8. After period 2, Mallory’s `exit bond` is refunded.
-
-
-### Mallory double spends her input:
-
-1. Mallory spends `UTXO1` in `TX1` to Bob, creating `UTXO2`.
-2. `TX1` is in-flight.
-3. Operator begins withholding blocks while `TX1` is still in-flight.
-Neither Mallory nor Bob know if the transaction has been included in a block.
-4. Mallory spends `UTXO1` in `TX2`.
-5. `TX2` is included in a withheld block.
-`TX1` is not included in a block.
-6. Bob starts an exit referencing `TX1` and places `exit bond`.
-7. Bob piggybacks onto the exit and places `piggyback bond`.
-8. In period 1, someone challenges the canonicity of `TX1` by revealing `TX2`.
-9. No one is able to respond to the challenge in period 2, so `TX1` is determined to be non-canonical.
-10. After period 2, Bob’s `piggyback bond` is refunded.
-The challenger receives Bob’s `exit bond`.
-
-
-### Mallory spends her input again later:
-
-1. Mallory spends `UTXO1` in `TX1` to Bob, creating `UTXO2.
-2. `TX1` is included in block `N`.
-3. Mallory spends `UTXO1` in `TX2`.
-4. `TX2` is included in block `N+M`
-5. Mallory starts an exit referencing `TX1` and places `exit bond`.
-6. In period 1, someone challenges the canonicity of `TX1` by revealing `TX2`.
-7. In period 2, someone responds to the challenge by proving that `TX1` was included before `TX2`.
-8. After period 2, the user who responded to the challenge receives Mallory’s `exit bond`.
-
-
-### Mallory attempts 
-
-1. Mallory spends `UTXO1` and `UTXO2` in `TX1.
-2. Mallory spends `UTXO1` in `TX2`.
-3. `TX1` and `TX2` are in-flight.
-4. Mallory starts an exit referencing `TX1` and places `exit bond`.
-5. Mallory starts an exit referencing `TX2` and places `exit bond`.
-6. In period 1 of the exit for `TX1`, someone challenges the canonicity of `TX1` by revealing `TX2`.
-7. In period 1 of the exit for `TX2`, someone challenges the canonicity of `TX2` by revealing `TX1`.
-8. After period 2 of the exit for `TX1`, the challenger receives `exit bond`.
-9. After period 2 of the exit for `TX2`, the challenger receives `exit bond`.
-
-
-### Operator tries to steal funds from an included transaction
-
-1. Alice spends `UTXO1` in `TX1` to Bob, creating `UTXO2`.
-2. `TX1` is included in (valid) block `N`.
-3. Operator creates invalid deposit transaction `TX2`, creating `UTXO3`.
-4. Operator spends `UTXO3` in `TX3`.
-5. Operator starts an exit referencing `TX3` and places `exit bond`.
-6. Operator piggybacks onto the exit and places `piggyback bond`.
-7. Bob starts a *standard* exit for `UTXO2`.
-8. Operator’s exit will process will have priority of position of `UTXO3`.
-Bob’s exit will have priority of position of `UTXO2`.
-9. Bob’s exit processes first, Operator’s exit processes second.
-All bonds are refunded.
-
-
-### Operator tries to steal funds from an in-flight transaction.
-
-1. Alice spends `UTXO1` in `TX1` to Bob, creating `UTXO2`.
-2. `TX1` is in-flight.
-3. Operator creates invalid deposit transaction `TX2`, creating `UTXO3`.
-4. Operator spends `UTXO3` in `TX3`.
-5. Operator starts an exit referencing `TX3` and places `exit bond`.
-6. Operator piggybacks onto the exit and places `piggyback bond`.
-7. Bob starts an exit referencing `TX1` and places `exit bond`.
-8. Bob piggybacks onto the exit and places `piggyback bond`.
-9. Alice is honest, so she hasn’t spent `UTXO1` in any transaction other than `TX1`.
-10. Operator’s exit will process will have priority of position of `UTXO3`.
-Bob’s exit will have priority of position of `UTXO1`.
-11. Bob’s exit processes first, Operator’s exit processes second.
-All bonds are refunded.
 
 
 ## Appendix
