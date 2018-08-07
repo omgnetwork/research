@@ -1,5 +1,8 @@
 # More Viable Plasma
 
+This document is based on the original [More Viable Plasma post](https://ethresear.ch/t/more-viable-plasma/2160/49) on ethresearch.
+
+
 ## Introduction
 
 [Minimal Viable Plasma](https://ethresear.ch/t/minimal-viable-plasma/426) (“Plasma MVP”) describes a simple specification for a UTXO-based Plasma chain.
