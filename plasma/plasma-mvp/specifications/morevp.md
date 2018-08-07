@@ -36,6 +36,7 @@ A formal treatment of the protocol is presented in the appendix.
 
 A deposit creates a new output on the Plasma chain.
 Although deposits are typically represented as transactions that spend some "special" input, we do not treat deposits as transactions for the purpose of the MoreVP exit protocol.
+Deposits can be safely exited with the Plasma MVP exit protocol.
 
 
 #### Spend Transaction
@@ -102,7 +103,8 @@ Because a transaction either is or is not canonical, only the transaction's inpu
 #### Priority
 
 The above game correctly selects the inputs or outputs that are eligible to exit.
-However, we still need to enforce an ordering on exits to ensure that all outputs created by valid transactions will be paid out before any output created by an invalid transaction.
+However, invalid transactions can still be exitable.
+We therefore need to enforce an ordering on exits to ensure that all outputs created by valid transactions will be paid out before any output created by an invalid transaction.
 We do this by ordering every exit by the position of the *youngest input* to the transaction referenced in each exit, regardless of whether an input or an output is being exited.
 
 
@@ -232,9 +234,9 @@ Therefore, every exit, no matter the protocol used, must be included in the same
 3. Operator begins withholding blocks while `TX1` is still in-flight.
 Neither Alice nor Bob know if the transaction has been included in a block.
 4. Someone with access to `TX1` (Alice, Bob, or otherwise) starts an exit referencing `TX1` and places `exit bond`.
-5. Alice and Bob piggyback onto the exit and each place `piggyback bond`.
+5. Bob piggybacks onto the exit and places `piggyback bond`.
 6. Alice is honest, so she hasn’t spent `UTXO1` in any transaction other than `TX1`.
-7. After period 2, Bob receives the value of `UTXO2`, Alice does not receive the value of `UTXO1`.
+7. After period 2, Bob receives the value of `UTXO2`.
 All bonds are refunded.
 
 
@@ -304,7 +306,7 @@ The challenger receives Bob’s `exit bond`.
 7. Bob starts a *standard* exit for `UTXO2`.
 8. Operator’s exit will have priority of position of `UTXO3`.
 Bob’s exit will have priority of position of `UTXO2`.
-9. Bob receives the value of `UTXO2` first, Operator receives the value of `UTXO4` second.
+9. Bob receives the value of `UTXO2` first, Operator receives the value of `UTXO4` second (ideally contract is empty by this point).
 All bonds are refunded.
 
 
@@ -321,7 +323,7 @@ All bonds are refunded.
 9. Alice is honest, so she hasn’t spent `UTXO1` in any transaction other than `TX1`.
 10. Operator’s exit will have priority of position of `UTXO3`.
 Bob’s exit will have priority of position of `UTXO1`.
-11. Bob receives the value of `UTXO2` first, Operator receives the value of `UTXO4` second.
+11. Bob receives the value of `UTXO2` first, Operator receives the value of `UTXO4` second (ideally contract is empty by this point).
 All bonds are refunded.
 
 
@@ -352,6 +354,7 @@ We want to mitigate the impact of this attack as much as possible so that this d
 
 One way to partially mitigate this attack is for each user who piggybacks to cover some portion of `exit bond`.
 This cuts the per-person value of `exit bond` proportionally to the number of users who have piggybacked.
+Note that this is a stronger mitigation the more users are piggybacking on the exit and would not have any impact if only a single user starts the exit/piggybacks.
 
 
 ###### Small Exit Bond
