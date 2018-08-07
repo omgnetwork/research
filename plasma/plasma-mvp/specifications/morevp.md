@@ -32,15 +32,15 @@ A formal treatment of the protocol is presented in the appendix.
 
 ### Definitions
 
-#### Spend Transaction
-
-A spend transaction is any transaction that spends a UTXO present on the Plasma chain.
-
-
 #### Deposit
 
 A deposit creates a new output on the Plasma chain.
 Although deposits are typically represented as transactions that spend some "special" input, we do not treat deposits as transactions for the purpose of the MoreVP exit protocol.
+
+
+#### Spend Transaction
+
+A spend transaction is any transaction that spends a UTXO present on the Plasma chain.
 
 
 #### In-flight Transaction
@@ -71,8 +71,8 @@ If the other transaction is not included in the chain, then we can’t tell whic
 
 #### Exitable Transaction
 
-If a transaction is “exitable,” then a user may attempt to start an exit that references the transaction.
 A spend transaction can be called “exitable” if the transaction is correctly formed (e.g. more input value than output value, inputs older than outputs, proper structure) and is properly signed by the owners of the transaction’s inputs.
+If a transaction is “exitable,” then a user may attempt to start an exit that references the transaction.
 
 
 #### Valid Transaction
@@ -80,12 +80,12 @@ A spend transaction can be called “exitable” if the transaction is correctly
 A spend transaction is “valid” if and only if it is exitable, canonical, and only stems from valid transactions (i.e. all transactions in the history are also valid transactions).
 Note that a transaction would therefore be considered invalid if even a single invalid transaction is present in its history.
 An exitable transaction is not necessarily a valid transaction, but all valid transactions are, by definition, exitable.
-
+Our exit mechanism ensures that all outputs created by valid transactions can process before any output created by an invalid transaction. 
 
 ### Desired Exit Mechanism
 
-The MoreVP exit protocol allows the owners of both inputs and outputs to a transaction to attempt an exit.
-We want to design a mechanism that allows these inputs and outputs to be withdrawn under the following conditions.
+The MoreVP exit protocol allows the owners of both inputs and outputs to transactions to attempt an exit.
+We want to design a mechanism that allows inputs and outputs to be withdrawn under the following conditions.
 
 The owner of an input `in` to a transaction `tx` must prove that:
 1. `tx` is exitable.
@@ -97,6 +97,7 @@ The owner of an output `out` to a transaction `tx` must prove that:
 2. `tx` is canonical.
 3. `out` is not spent.
 
+Because a transaction either is or is not canonical, only the transaction's inputs or outputs, and not both, may exit.
 
 #### Priority
 
@@ -111,8 +112,8 @@ We do this by ordering every exit by the position of the *youngest input* to the
 
 The MoreVP exit protocol described above guarantees that correctly behaving users will always be able to withdraw any funds they hold on the Plasma chain.
 However, we avoided describing how the users actually prove the statements they’re required to prove.
-This section presents a specification for an implementation of the exit protocol.
-The implementation is designed to be deployed to Ethereum and, as a result, some details of this specification take into account limitations of the EVM.
+This section presents a specification for the exit protocol.
+The MoreVP mechanism is designed to be deployed to Ethereum and, as a result, some details of this specification take into account limitations of the EVM.
 
 Additionally, the MoreVP exit protocol is not necessary in all cases.
 Previous work shows that we can use the Plasma MVP exit protocol without confirmation signatures for any transaction included before an invalid (or, in the case of withheld blocks, potentially invalid) transaction.
@@ -272,7 +273,7 @@ The challenger receives Bob’s `exit bond`.
 1. Mallory spends `UTXO1` in `TX1` to Bob, creating `UTXO2`.
 2. `TX1` is included in block `N`.
 3. Mallory spends `UTXO1` in `TX2`.
-4. `TX2` is included in block `N+M`
+4. `TX2` is included in block `N+M`.
 5. Mallory starts an exit referencing `TX1` and places `exit bond`.
 6. In period 1, someone challenges the canonicity of `TX1` by revealing `TX2`.
 7. In period 2, someone responds to the challenge by proving that `TX1` was included before `TX2`.
