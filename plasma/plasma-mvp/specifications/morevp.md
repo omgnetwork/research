@@ -226,6 +226,7 @@ If the chain is byzantine, not piggybacking could potentially mean loss of funds
 
 The MoreVP protocol can be combined with the Plasma MVP protocol in a way that simultaneously preserves the integrity of exits and minimizes gas cost. 
 Owners of outputs on the Plasma chain should be able to start an exit via either mechanism, but not both.
+Implementers can check this whenever an MVP exit is being submitted or whenever a MoreVP exit is being piggybacked.
 Although the two protocols use different determinations for exit priority, we still need a total ordering on exits.
 Therefore, every exit, no matter the protocol used, must be included in the same priority queue for processing.
 
