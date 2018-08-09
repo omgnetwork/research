@@ -27,9 +27,9 @@ We can further combine several optimizations to enhance user experience and redu
 Future work will focus on decreasing implementation complexity of the design and minimizing contract gas usage.
 
 
-## Exit Protocol
+## Basic Mechanism
 
-In this section, we specify the MoreVP exit protocol and give an intuitive argument toward its correctness.
+In this section, we specify the basic MoreVP exit mechanism and give an intuitive argument toward its correctness.
 A formal treatment of the protocol is presented in the appendix.
 
 
@@ -142,8 +142,10 @@ The end result is that we can correctly determine which inputs or outputs should
 
 The MoreVP exit protocol requires the use of a “challenge-response” mechanism, whereby users can submit a challenge but are subject to a response that invalidates the challenge.
 To give users enough time to respond to a challenge, the exit process is split into two “periods.” When challenges are subject to a response, we require that the challenges be submitted before the end of the first exit period and that responses be submitted before the end of the second.
-We define each period to have a length of half the minimum finalization period (MFP).
-Currently, the MFP is set to 7 days, so each period has a length of 3.5 days.
+We define each period to have a length of half the minimum finalization period (`MFP`).
+Currently, `MFP` is set to 7 days, so each period has a length of 3.5 days.
+We also define the liveness interval (`LI`) as `MFP/2`.
+Watchers must validate the chain at least once every `LI`.
 
 
 #### Starting the Exit
