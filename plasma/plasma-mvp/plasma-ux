@@ -1,0 +1,59 @@
+# OMG Plasma UX
+
+This document maps out the basic UX of the OMG network Plasma chain. 
+
+
+## User Interactions
+
+### Depositing
+
+Users can move funds from Ethereum to the Plasma chain by depositing their funds into the Plasma smart contract.
+Luckily, this takes the form of an Ethereum transaction.
+We can take advantage of existing integrations (MetaMask) for deposits.
+
+
+### Viewing Balances
+
+Users should be able to easily query and view their balances.
+We plan to include a state tree in each block that aggregates UTXOs by some standard method (e.g. UTXOs by address).
+Light clients should be able to ask for pieces of this tree to retrieve UTXOs for a single address.
+In comparison to Bitcoin, this vastly simplifies the process of querying all UTXOs owned by a specific user.
+
+### Simple Transfers
+
+Users are allowed to make simple transfers, whereby money is sent from one user directly to another, without the need for an exchange.
+Transfers reference a set of UTXOs to be spent and list a new set of UTXOs to be created.
+Each input points to a unique UTXO identifier, each output specifies an owner and an amount.
+The difference between the total input value and total output value is considered the transaction fee.
+Transactions are signed on a user’s machine and sent to a node, where they’re broadcast and eventually included in a block.
+
+If a user doesn’t own all of the inputs to a transaction, it may be necessary to cache transactions until all of the signatures are received.
+These cases should probably be handled on the DApp level. 
+
+
+### Exchange Transfers
+
+Users can also make exchange transfers to exchange one asset for another.
+Exchange transfers are very similar to simple transfers, except that they specify some order parameters.
+Exchanges can also be cancelled any time before they’re included in the Plasma chain.
+A successfully cancelled trade will not execute.  
+
+
+### Exits
+
+Users can withdraw their funds at any time by submitting an “exit” transaction to the Plasma contract on Ethereum.
+When the consensus mechanism is functioning properly, users can withdraw at their earliest convenience.
+However, if the chain is faulty, it may be necessary for the user to exit within some short period of time (~ 1 week).
+Clients should alert users in as many ways possible (notification, email, text, etc.) if such a fault ever occurs.
+Opt-in alerts and easy exits via MetaMask (or maybe opt-out for any chains on which the user has funds) would likely improve the UX of these events.
+
+
+## Further Considerations
+
+### Diverse UX
+
+Anyone attempting a strong UX integration should consider that Plasma chains are highly diverse.
+The format and impact of transactions can differ greatly between implementations.
+This difference is evident when comparing Plasma MVP and Plasma Cash - the design of Plasma Cash makes it much more light-client friendly but also less suited to arbitrary exchange.
+It’s therefore unlikely that we can create a standardized interface for *all* Plasma chains.
+It’s probably more reasonable to create an interface to a few widely used designs. 
