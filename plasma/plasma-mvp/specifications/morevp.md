@@ -7,22 +7,22 @@ This document is based on the original [More Viable Plasma post](https://ethrese
 
 [Minimal Viable Plasma](https://ethresear.ch/t/minimal-viable-plasma/426) (“Plasma MVP”) describes a simple specification for a UTXO-based Plasma chain.
 A key component of the Plasma MVP design is a protocol for “exits,” whereby a user may withdraw back to the root chain any funds available to them on the Plasma chain.
-The protocol presented in the specification requires users sign two signatures for every transaction.
-Concerns over the poor user experience presented by this protocol motivated the search for an alternative exit protocol.
+The protocol presented in the MVP specification requires users sign two signatures for every transaction.
+Concerns over the poor user experience presented by this requirement motivated the search for an alternative exit protocol.
 
-In this document, we describe More Viable Plasma (“MoreVP”), a modification to the Plasma MVP exit protocol that improves user experience.
+In this document, we describe More Viable Plasma (“MoreVP”), a modification to the Plasma MVP exit protocol that removes the need for a second signature and generally improves user experience.
 The MoreVP exit protocol ensures the security of assets for clients correctly following the protocol.
 We initially present the most basic form of the MoreVP protocol and provide intuition towards its correctness.
-We formalize certain requirements for Plasma MVP exit protocols and provide a proof that this protocol satisfies these requirements in the appendix.
+We also formalize certain requirements for Plasma MVP exit protocols and provide a proof that this protocol satisfies these requirements in the appendix.
 
 An optimized version of the protocol is presented to account for restrictions of the Ethereum Virtual Machine.
-We further optimize on the observation that the MoreVP exit protocol is only necessary for transactions that are in-flight when a chain becomes byzantine.
+We further optimize on the observation that the MoreVP exit protocol is only necessary for transactions that are in-flight when a Plasma chain becomes byzantine.
 
 We note the existence of certain attack vectors in the protocol, but find that most of these vectors can be largely mitigated and isolated to a relatively small attack surface.
 These attack vectors and their mitigations are described in detail.
 Although we conclude that the design is safe under certain reasonable assumptions about user behavior, some points are highlighted and earmarked for future consideration.
 
-Overall, the MoreVP exit protocol is a significant improvement over the original Plasma MVP exit protocol.
+Overall, we find that the MoreVP exit protocol is a significant improvement over the original Plasma MVP exit protocol.
 We can further combine several optimizations to enhance user experience and reduce costs for users.
 Future work will focus on decreasing implementation complexity of the design and minimizing contract gas usage.
 
@@ -38,13 +38,13 @@ A formal treatment of the protocol is presented in the appendix.
 #### Deposit
 
 A deposit creates a new output on the Plasma chain.
-Although deposits are typically represented as transactions that spend some "special" input, we do not treat deposits as transactions for the purpose of the MoreVP exit protocol.
-Deposits can be safely exited with the Plasma MVP exit protocol.
+Although deposits are typically represented as transactions that spend some "special" input, we do not allow deposits to exit via the MoreVP exit protocol.
+Instead, deposits can be safely exited with the Plasma MVP exit protocol.
 
 
 #### Spend Transaction
 
-A spend transaction is any transaction that spends a UTXO present on the Plasma chain.
+A spend transaction is any transaction that spends a UTXO already present on the Plasma chain.
 
 
 #### In-flight Transaction
@@ -86,6 +86,7 @@ Note that a transaction would therefore be considered invalid if even a single i
 An exitable transaction is not necessarily a valid transaction, but all valid transactions are, by definition, exitable.
 Our exit mechanism ensures that all outputs created by valid transactions can process before any output created by an invalid transaction. 
 
+
 ### Desired Exit Mechanism
 
 The MoreVP exit protocol allows the owners of both inputs and outputs to transactions to attempt an exit.
@@ -103,6 +104,7 @@ The owner of an output `out` to a transaction `tx` must prove that:
 
 Because a transaction either is or is not canonical, only the transaction's inputs or outputs, and not both, may exit.
 
+
 #### Priority
 
 The above game correctly selects the inputs or outputs that are eligible to exit.
@@ -115,13 +117,13 @@ We do this by ordering every exit by the position of the *youngest input* to the
 
 ### Motivation
 
-The MoreVP exit protocol described above guarantees that correctly behaving users will always be able to withdraw any funds they hold on the Plasma chain.
+The basic exit mechanism described above guarantees that correctly behaving users will always be able to withdraw any funds they hold on the Plasma chain.
 However, we avoided describing how the users actually prove the statements they’re required to prove.
-This section presents a specification for the exit protocol.
-The MoreVP mechanism is designed to be deployed to Ethereum and, as a result, some details of this specification take into account limitations of the EVM.
+This section presents a more detailed specification for the exit protocol.
+The MoreVP mechanism is designed to be deployed to Ethereum and, as a result, some particulars of this specification take into account limitations of the EVM.
 
-Additionally, the MoreVP exit protocol is not necessary in all cases.
-Previous work shows that we can use the Plasma MVP exit protocol without confirmation signatures for any transaction included before an invalid (or, in the case of withheld blocks, potentially invalid) transaction.
+Additionally, it's important to note that the MoreVP exit protocol is not necessary in all cases.
+We can use the Plasma MVP exit protocol without confirmation signatures for any transaction included before an invalid (or, in the case of withheld blocks, potentially invalid) transaction.
 We therefore only need to make use of the MoreVP protocol for the set transactions that are in-flight when a Plasma chain becomes byzantine.
 
 The MoreVP protocol guarantees that if transaction is exitable then either the unspent inputs or unspent outputs can be withdrawn.
@@ -140,12 +142,11 @@ The end result is that we can correctly determine which inputs or outputs should
 
 #### Timeline
 
-The MoreVP exit protocol requires the use of a “challenge-response” mechanism, whereby users can submit a challenge but are subject to a response that invalidates the challenge.
+The MoreVP exit protocol makes use of a “challenge-response” mechanism, whereby users can submit a challenge but are subject to a response that invalidates the challenge.
 To give users enough time to respond to a challenge, the exit process is split into two “periods.” When challenges are subject to a response, we require that the challenges be submitted before the end of the first exit period and that responses be submitted before the end of the second.
 We define each period to have a length of half the minimum finalization period (`MFP`).
 Currently, `MFP` is set to 7 days, so each period has a length of 3.5 days.
-We also define the liveness interval (`LI`) as `MFP/2`.
-Watchers must validate the chain at least once every `LI`.
+Watchers must validate the chain at least once every period (`MFP/2`).
 
 
 #### Starting the Exit
@@ -383,6 +384,8 @@ This will probably also be necessary from a user experience point of view, as we
 
 
 ## Appendix
+
+<!-- TODO: Clean up this entire proof section -->
 
 ### Formalization of Definitions
 
