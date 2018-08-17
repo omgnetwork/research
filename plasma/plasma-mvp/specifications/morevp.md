@@ -223,6 +223,14 @@ Users who choose not to piggyback an exit are choosing not to attempt a withdraw
 If the chain is byzantine, not piggybacking could potentially mean loss of funds.
 
 
+#### Processing Exits
+
+An exit can be processed after the second period.
+If the referenced transaction was determined to be canonical, all piggybacked outputs still unchallenged are paid out.
+If the referenced transaction was determined to be non-canonical, all piggybacked inputs still unchallenged are paid out.
+Any inputs or outputs paid out should be saved in the contract so that any future exit referencing the same inputs or outputs can be challenged.
+
+
 #### Combining with Plasma MVP Exit Protocol
 
 The MoreVP protocol can be combined with the Plasma MVP protocol in a way that simultaneously preserves the integrity of exits and minimizes gas cost. 
