@@ -2,6 +2,8 @@
 
 Design from conversation with vi, David Knott, Ben Jones, and Eva Beylin. Thanks to Eva Beylin & Kelsie Nabben for review/edits.
 
+eth research link: https://ethresear.ch/t/simple-fast-withdrawals/2128
+
 ---
 
 ## TL;DR
