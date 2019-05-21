@@ -20,7 +20,7 @@ This does not provide fast finality, but remove the issue of plasma tx cannot be
 ### Design
 
 1. If a tx is using a mined input in plasma chain, it would need confirmation signature of the input owner signing-off previous block.
-1. If the tx input is in-flight, do not need the confirmation signature of input block.
+1. If the tx input is in-flight (those would eventually be in the next block), do not need the confirmation signature of input block.
 1. To exit an output or to use an output in next tx which is in different, the user needs to disclose the confirmation signature that sign-off the whole block that mines the chained txs (signing block hash). So in any case, the proof information to finalize the txs within the block would be disclosed at once (promising atomic).
 
 Be aware that it is possible for a user to chain A->B->C->D, but operator mines A->B->C only without D in the next block. In this case, the transaction data of D is useless now as C is mined and would need to regenerate D' including confirmation sign of the block of A->B->C.
